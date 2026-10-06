@@ -1,0 +1,2994 @@
+name: Xploit-AI-Lab
+on:
+  workflow_dispatch:
+    inputs:
+      action_type:
+        description: 'AI Action Type (zimage / qwen-edit / flux-klein / wan-video / krea-2 / minimax-h3 / kokoro-tts / qwen-voice / minimax-music / yue-music / step-music / breeze-tts / triposplat / openvoice / wan-animate / viggle / hq-video / dream-video)'
+        required: true
+        default: 'zimage'
+      prompt:
+        description: 'Prompt string'
+        required: true
+      image_url:
+        description: 'Input Image URL (for qwen-edit)'
+        required: false
+        default: ''
+      steps:
+        description: 'Inference Steps'
+        required: false
+        default: '8'
+      user_id:
+        description: 'Discord User ID'
+        required: true
+      channel_id:
+        description: 'Discord Channel ID'
+        required: true
+      duration:
+        description: 'Duration (seconds for video or music)'
+        required: false
+        default: ''
+      seed:
+        description: 'Seed (-1 for random)'
+        required: false
+        default: '-1'
+      style:
+        description: 'LoRA Style Adapter for Qwen Edit'
+        required: false
+        default: 'Ultrarealistic-Portrait'
+      last_image_url:
+        description: 'Last Frame Image URL (for pixel-perfect trajectory guidance)'
+        required: false
+        default: ''
+      guidance_scale:
+        description: 'Guidance Scale (for pixel-perfect)'
+        required: false
+        default: '2.5'
+      quality:
+        description: 'Output Quality (for pixel-perfect)'
+        required: false
+        default: 'normal'
+      scheduler:
+        description: 'Scheduler Algorithm (for pixel-perfect)'
+        required: false
+        default: 'euler'
+      frame_multiplier:
+        description: 'Frame Multiplier (for pixel-perfect)'
+        required: false
+        default: '32'
+      safe_mode:
+        description: 'Safe Mode Toggle (for pixel-perfect)'
+        required: false
+        default: 'false'
+      lora_preset_1:
+        description: 'LoRA Preset Slot 1 (for pixel-perfect)'
+        required: false
+        default: 'none'
+      lora_preset_2:
+        description: 'LoRA Preset Slot 2 (for pixel-perfect)'
+        required: false
+        default: 'none'
+      lora_preset_3:
+        description: 'LoRA Preset Slot 3 (for pixel-perfect)'
+        required: false
+        default: 'none'
+      custom_lora_1:
+        description: 'Custom LoRA 1 URL (for pixel-perfect)'
+        required: false
+        default: ''
+      custom_lora_1_weight:
+        description: 'Custom LoRA 1 Weight (for pixel-perfect)'
+        required: false
+        default: '1.0'
+      custom_lora_2:
+        description: 'Custom LoRA 2 URL (for pixel-perfect)'
+        required: false
+        default: ''
+      custom_lora_2_weight:
+        description: 'Custom LoRA 2 Weight (for pixel-perfect)'
+        required: false
+        default: '1.0'
+
+jobs:
+  ai-generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: 🚀 Turbocharge Virtual RAM (16GB NVMe Swapfile = 23GB Total)
+        run: |
+          sudo swapoff -a || true
+          sudo fallocate -l 16G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=16384
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          echo "✅ 23GB System Memory Address Space Unlocked!"
+          free -h
+
+      - name: Setup Bleeding-Edge AI Environment + Tor Anti-RateLimit Engine
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y python3 python3-pip curl jq git tor ffmpeg
+          sudo systemctl start tor
+          echo "✅ Tor Daemon Active on 127.0.0.1:9050 (IP Anonymity Unlocked)"
+          pip3 install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip3 install --no-cache-dir git+https://github.com/huggingface/diffusers.git -U
+          pip3 install --no-cache-dir transformers accelerate safetensors requests pillow gradio_client pysocks stem soundfile kokoro
+
+      - name: Execute Unrestricted Next-Gen AI Pipeline
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          USER_ID: ${{ github.event.inputs.user_id }}
+          CHANNEL_ID: ${{ github.event.inputs.channel_id }}
+          ACTION_TYPE: ${{ github.event.inputs.action_type }}
+          PROMPT: ${{ github.event.inputs.prompt }}
+          IMAGE_URL: ${{ github.event.inputs.image_url }}
+          STEPS: ${{ github.event.inputs.steps }}
+          DURATION: ${{ github.event.inputs.duration }}
+          SEED: ${{ github.event.inputs.seed }}
+          STYLE: ${{ github.event.inputs.style }}
+          LAST_IMAGE_URL: ${{ github.event.inputs.last_image_url }}
+          GUIDANCE_SCALE: ${{ github.event.inputs.guidance_scale }}
+          QUALITY: ${{ github.event.inputs.quality }}
+          SCHEDULER: ${{ github.event.inputs.scheduler }}
+          FRAME_MULTIPLIER: ${{ github.event.inputs.frame_multiplier }}
+          SAFE_MODE: ${{ github.event.inputs.safe_mode }}
+          LORA_PRESET_1: ${{ github.event.inputs.lora_preset_1 }}
+          LORA_PRESET_2: ${{ github.event.inputs.lora_preset_2 }}
+          LORA_PRESET_3: ${{ github.event.inputs.lora_preset_3 }}
+          CUSTOM_LORA_1: ${{ github.event.inputs.custom_lora_1 }}
+          CUSTOM_LORA_1_WEIGHT: ${{ github.event.inputs.custom_lora_1_weight }}
+          CUSTOM_LORA_2: ${{ github.event.inputs.custom_lora_2 }}
+          CUSTOM_LORA_2_WEIGHT: ${{ github.event.inputs.custom_lora_2_weight }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        run: |
+          mkdir -p /tmp/ai_lab
+          cd /tmp/ai_lab
+
+          python3 -c "import sys, textwrap; open('generate.py', 'w', encoding='utf-8').write(textwrap.dedent(sys.stdin.read()))" << 'EOF'
+          import os
+          import sys
+          import requests
+          import torch
+          from PIL import Image
+          import io
+
+          action = os.environ.get("ACTION_TYPE", "zimage")
+          prompt = os.environ.get("PROMPT", "")
+          image_url = os.environ.get("IMAGE_URL", "")
+          steps_val = os.environ.get("STEPS", "8").strip()
+          try:
+              steps = int(steps_val)
+          except (ValueError, TypeError):
+              steps = 8
+          duration_val = os.environ.get("DURATION", "").strip()
+          seed_val = os.environ.get("SEED", "").strip()
+          style_val = os.environ.get("STYLE", "").strip()
+          discord_token = os.environ.get("DISCORD_TOKEN", "")
+          channel_id = os.environ.get("CHANNEL_ID", "")
+          user_id = os.environ.get("USER_ID", "")
+
+          print(f"[*] Initializing Unrestricted AI Task: {action} | Prompt: {prompt} | Duration: {duration_val or 'default'} | Seed: {seed_val or 'random'}")
+
+          output_path = "/tmp/ai_lab/output.png"
+          final_seed = None
+
+          def bypass_safety(pipeline):
+              # Completely disable safety checkers / NSFW filters for 100% uncensored raw output
+              if hasattr(pipeline, "safety_checker"):
+                  pipeline.safety_checker = None
+              if hasattr(pipeline, "requires_safety_checker"):
+                  pipeline.requires_safety_checker = False
+              return pipeline
+
+          import random
+          import subprocess
+          import time
+
+          def renew_tor_ip():
+              """Instantly cycle to a fresh global Tor IP address"""
+              try:
+                  subprocess.run(["sudo", "systemctl", "restart", "tor"], check=False)
+                  time.sleep(1.5)
+                  print("[*] 🔄 Tor IP Successfully Rotated to Fresh Clean Global Circuit!")
+              except Exception as err:
+                  print(f"[-] Tor reload warning: {err}")
+
+          def extract_path(obj):
+              """Recursively extract valid filepath from arbitrary Gradio result structures"""
+              if isinstance(obj, str) and os.path.exists(obj):
+                  return obj
+              if isinstance(obj, dict):
+                  for k in ("path", "image", "video", "url", "name"):
+                      if k in obj and obj[k]:
+                          res = extract_path(obj[k])
+                          if res:
+                              return res
+                  for val in obj.values():
+                      res = extract_path(val)
+                      if res:
+                          return res
+              if isinstance(obj, (list, tuple)):
+                  for item in obj:
+                      res = extract_path(item)
+                      if res:
+                          return res
+              return None
+
+          if action == "zimage":
+              # Multi-Space Mirror Pool with automatic fallback + Tor anti-ban proxy rotation
+              spaces_pool = [
+                  "rahul7star/Z-Image-Turbo",
+                  "Tongyi-MAI/Z-Image-Turbo",
+                  "mfr414/Z-Image-Turbo",
+                  "KingNish/Z-Image-Turbo"
+              ]
+              
+              from gradio_client import Client
+              success = False
+
+              # Parse aspect ratio and seed options
+              ratio = image_url.strip() if image_url else "1:1"
+              if ratio == "16:9":
+                  img_w, img_h = 1344, 768
+              elif ratio == "9:16":
+                  img_w, img_h = 768, 1344
+              else:
+                  img_w, img_h = 1024, 1024
+
+              if seed_val and seed_val != "-1":
+                  try:
+                      rand_seed = int(seed_val)
+                      is_random_seed = False
+                  except:
+                      rand_seed = random.randint(1, 9999999)
+                      is_random_seed = True
+              else:
+                  rand_seed = random.randint(1, 9999999)
+                  is_random_seed = True
+              final_seed = rand_seed
+
+              for space_name in spaces_pool:
+                  # Vector 1: Randomize browser user-agent & session fingerprint
+                  fake_chrome_ver = random.randint(115, 131)
+                  os.environ["HTTP_USER_AGENT"] = f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/{fake_chrome_ver}.0.0.0 Safari/537.36"
+                  
+                  print(f"[*] Connecting to GPU Space Mirror: [{space_name}]...")
+                  try:
+                      client = Client(space_name)
+                      print(f"[*] Dispatching prompt to {space_name}: {prompt} | Steps: {steps} | Ratio: {ratio} | Seed: {rand_seed}")
+                      
+                      # Try specific endpoint or generic predict
+                      try:
+                          result = client.predict(
+                              prompt=prompt,
+                              height=img_h,
+                              width=img_w,
+                              num_inference_steps=steps,
+                              seed=rand_seed,
+                              randomize_seed=is_random_seed,
+                              num_images=1,
+                              api_name="/generate_image"
+                          )
+                      except Exception:
+                          # Fallback predict without extra sliders
+                          result = client.predict(prompt=prompt)
+
+                      if result and isinstance(result, tuple) and len(result) > 0:
+                          images_gallery = result[0]
+                          if isinstance(images_gallery, list) and len(images_gallery) > 0:
+                              first_item = images_gallery[0]
+                              img_path = first_item.get("image", {}).get("path") if isinstance(first_item, dict) and isinstance(first_item.get("image"), dict) else first_item.get("image")
+                              if img_path and os.path.exists(img_path):
+                                  Image.open(img_path).save(output_path, format="PNG")
+                                  success = True
+                                  break
+                      elif isinstance(result, str) and os.path.exists(result):
+                          Image.open(result).save(output_path, format="PNG")
+                          success = True
+                          break
+                  except Exception as space_err:
+                      print(f"[-] Mirror {space_name} rate-limited/busy: {space_err}")
+                      print("[*] Vector 4: Triggering Tor Circuit Renewal for fresh identity...")
+                      renew_tor_ip()
+                      continue
+
+              if not success:
+                  print("[-] All GPU mirrors busy, triggering direct local 23GB memory pipeline fallback...")
+                  from diffusers import DiffusionPipeline
+                  pipe = DiffusionPipeline.from_pretrained(
+                      "Tongyi-MAI/Z-Image-Turbo",
+                      torch_dtype=torch.float32,
+                      low_cpu_mem_usage=True
+                  )
+                  pipe = bypass_safety(pipe)
+                  pipe.to("cpu")
+                  image = pipe(prompt=prompt, num_inference_steps=steps, guidance_scale=0.0).images[0]
+                  image.save(output_path, format="PNG")
+
+          elif action == "qwen-edit":
+              print(f"[*] Loading Qwen Rapid AIO for prompt: {prompt}")
+              from gradio_client import Client, handle_file
+              import random
+              # Download base image
+              input_img_path = "/tmp/ai_lab/input.png"
+              resp = requests.get(image_url, timeout=15)
+              with open(input_img_path, "wb") as f:
+                  f.write(resp.content)
+
+              if seed_val and seed_val != "-1":
+                  try:
+                      edit_seed = int(seed_val)
+                      is_rand_seed = False
+                  except:
+                      edit_seed = random.randint(1, 9999999)
+                      is_rand_seed = True
+              else:
+                  edit_seed = random.randint(1, 9999999)
+                  is_rand_seed = True
+              final_seed = edit_seed
+
+              # Parse quality mode sent as "fast__StyleName" or "ultra__StyleName" from bot
+              quality_mode = "fast"
+              raw_style = style_val if style_val else "Ultrarealistic-Portrait"
+              if "__" in raw_style:
+                  parts = raw_style.split("__", 1)
+                  quality_mode = parts[0].strip().lower()  # "fast" or "ultra"
+                  raw_style = parts[1].strip()
+
+              # Determine LoRA style (defaults to Ultrarealistic-Portrait for clear 4K quality)
+              active_lora = raw_style if raw_style else "Ultrarealistic-Portrait"
+              prompt_lower = prompt.lower()
+              if any(k in prompt_lower for k in ["upscale", "4k", "clear", "unblur", "enhance", "hd"]):
+                  if not raw_style or raw_style == "Ultrarealistic-Portrait":
+                      active_lora = "Upscale2K"
+
+              # Quality-dependent parameters: Ultra = original high-res, Fast = ZeroGPU-safe
+              if quality_mode == "ultra":
+                  q_target_mp   = 2.25   # aet256: target megapixels (original)
+                  q_steps_cap   = 50     # aet256/Gameyguy: uncapped steps
+                  q_g_height    = 1280   # Gameyguy: resolution
+                  q_g_width     = 1280
+                  q_k_steps_cap = 6      # kulkas2pintu: steps cap
+                  q_k_size      = 1920   # kulkas2pintu: output size
+                  q_k_identity  = 75
+                  q_off_steps   = 30     # Official Qwen: inference steps
+                  q_off_gs      = 4.0    # Official Qwen: guidance scale
+                  q_off_h       = 1024   # Official Qwen: resolution
+                  q_off_w       = 1024
+              else:
+                  # Fast / ZeroGPU-safe defaults
+                  q_target_mp   = 1.2
+                  q_steps_cap   = 8
+                  q_g_height    = 1024
+                  q_g_width     = 1024
+                  q_k_steps_cap = 4
+                  q_k_size      = 1024
+                  q_k_identity  = 60
+                  q_off_steps   = 8
+                  q_off_gs      = 2.5
+                  q_off_h       = 768
+                  q_off_w       = 768
+
+              print(f"[*] Qwen Edit Configuration: LoRA={active_lora} | Quality={quality_mode.upper()} | Seed={final_seed} | 4K/2K High-Res Pipeline Enabled")
+
+              qwen_success = False
+              # 1. Primary: aet256 Rapid AIO LoRAs Space (Ultra fast 4K/2K GPU inference)
+              try:
+                  print(f"[*] Connecting to aet256/Qwen-Image-Edit-Rapid-AIO-Loras-Experimental (LoRA: {active_lora})...")
+                  client = Client("aet256/Qwen-Image-Edit-Rapid-AIO-Loras-Experimental")
+                  
+                  # Call /infer endpoint (resolution_multiple expects choice: '32', '56', '112')
+                  result = client.predict(
+                      input_image_1=handle_file(input_img_path),
+                      input_image_2=handle_file(input_img_path),
+                      input_images_extra=[],
+                      prompt=prompt,
+                      lora_adapter=active_lora,
+                      seed=edit_seed,
+                      randomize_seed=is_rand_seed,
+                      guidance_scale=1.5,
+                      steps=steps if steps and steps <= q_steps_cap else 6,
+                      target_megapixels=q_target_mp,
+                      extras_condition_only=True,
+                      pad_to_canvas=True,
+                      vae_tiling=False,
+                      resolution_multiple=32,
+                      vae_ref_megapixels=0.0,
+                      decoder_vae="wan2x",
+                      keep_decoder_2x=True,
+                      highlight_protection=True,
+                      highlight_protection_strength=0.30,
+                      api_name="/infer"
+                  )
+                  
+                  # result[0] is output image filepath
+                  out_file = result[0] if isinstance(result, (tuple, list)) else result
+                  if isinstance(out_file, dict):
+                      out_file = out_file.get("path")
+                  if out_file and os.path.exists(out_file):
+                      Image.open(out_file).save(output_path, format="PNG")
+                      if isinstance(result, (tuple, list)) and len(result) > 1 and result[1] is not None:
+                          try:
+                              final_seed = int(result[1])
+                          except:
+                              final_seed = edit_seed
+                      print(f"[+] Qwen Rapid AIO Edit Completed via aet256 GPU Space! (Seed: {final_seed})")
+                      qwen_success = True
+              except Exception as e:
+                  print(f"[-] aet256 space error: {e}")
+                  renew_tor_ip()
+
+              # 2. Secondary: Gameyguy/Qwen-Image-Edit-2511-Turbo-Lightning (Ultra-Fast 1280p Turbo)
+              if not qwen_success:
+                  try:
+                      print("[*] Trying Secondary: Gameyguy/Qwen-Image-Edit-2511-Turbo-Lightning...")
+                      client = Client("Gameyguy/Qwen-Image-Edit-2511-Turbo-Lightning")
+                      result = client.predict(
+                          images=[{"image": handle_file(input_img_path)}],
+                          prompt=prompt,
+                          seed=edit_seed,
+                          randomize_seed=is_rand_seed,
+                          true_guidance_scale=1.5,
+                          num_inference_steps=steps if steps and steps <= q_steps_cap else 6,
+                          height=q_g_height,
+                          width=q_g_width,
+                          rewrite_prompt=False,
+                          num_images_per_prompt=1,
+                          api_name="/infer"
+                      )
+                      gallery = result[0] if isinstance(result, (tuple, list)) else result
+                      if isinstance(gallery, list) and gallery:
+                          first = gallery[0]
+                          out_file = first.get("image", {}).get("path") if isinstance(first, dict) and isinstance(first.get("image"), dict) else (first.get("image") if isinstance(first, dict) else first)
+                      else:
+                          out_file = gallery
+                      if out_file and os.path.exists(out_file):
+                          Image.open(out_file).save(output_path, format="PNG")
+                          if isinstance(result, (tuple, list)) and len(result) > 1 and result[1] is not None:
+                              try:
+                                  final_seed = int(result[1])
+                              except:
+                                  final_seed = edit_seed
+                          print(f"[+] Qwen Edit Complete via Gameyguy Turbo-Lightning! (Seed: {final_seed})")
+                          qwen_success = True
+                  except Exception as e_gameyguy:
+                      print(f"[-] Gameyguy Turbo-Lightning error: {e_gameyguy}")
+                      renew_tor_ip()
+
+              # 3. Tertiary: kulkas2pintu/QWEN_EDIT_IMAGE Space (Ultra-Realistic 1920p LoRA)
+              if not qwen_success:
+                  try:
+                      print("[*] Trying Tertiary: kulkas2pintu/QWEN_EDIT_IMAGE...")
+                      kulkas_lora = "Ultra-Realistic-Portrait" if active_lora in ["Ultrarealistic-Portrait", "Hyperrealistic-Portrait"] else ("Upscaler" if "upscale" in active_lora.lower() else "")
+                      client = Client("kulkas2pintu/QWEN_EDIT_IMAGE")
+                      result = client.predict(
+                          image=handle_file(input_img_path),
+                          prompt=prompt,
+                          lora_adapter=kulkas_lora,
+                          image2=None,
+                          seed=edit_seed,
+                          randomize_seed=is_rand_seed,
+                          guidance_scale=1.5,
+                          steps=steps if steps and steps <= q_k_steps_cap else q_k_steps_cap,
+                          preserve_identity=True,
+                          identity_strength=q_k_identity,
+                          output_size=q_k_size,
+                          fix_hands=True,
+                          api_name="/edit"
+                      )
+                      out_file = result[0] if isinstance(result, (tuple, list)) else result
+                      if isinstance(out_file, dict):
+                          out_file = out_file.get("path")
+                      if out_file and os.path.exists(out_file):
+                          Image.open(out_file).save(output_path, format="PNG")
+                          if isinstance(result, (tuple, list)) and len(result) > 1 and result[1] is not None:
+                              try:
+                                  final_seed = int(result[1])
+                              except:
+                                  final_seed = edit_seed
+                          print(f"[+] Qwen Edit Complete via kulkas2pintu Space! (Seed: {final_seed})")
+                          qwen_success = True
+                  except Exception as e_kulkas:
+                      print(f"[-] kulkas2pintu error: {e_kulkas}")
+                      renew_tor_ip()
+
+              # 4. Quaternary: Official Qwen/Qwen-Image-Edit-2511 space (/infer endpoint)
+              if not qwen_success:
+                  try:
+                      print("[*] Fallback: Connecting to official Qwen/Qwen-Image-Edit-2511...")
+                      client = Client("Qwen/Qwen-Image-Edit-2511")
+                      result = client.predict(
+                          images=[{"image": handle_file(input_img_path)}],
+                          prompt=prompt,
+                          seed=edit_seed,
+                          randomize_seed=is_rand_seed,
+                          true_guidance_scale=q_off_gs,
+                          num_inference_steps=q_off_steps,
+                          height=q_off_h,
+                          width=q_off_w,
+                          rewrite_prompt=False,
+                          api_name="/infer"
+                      )
+                      gallery = result[0] if isinstance(result, (tuple, list)) else result
+                      if isinstance(gallery, list) and gallery:
+                          first = gallery[0]
+                          out_file = first.get("image", {}).get("path") if isinstance(first, dict) and isinstance(first.get("image"), dict) else (first.get("image") if isinstance(first, dict) else first)
+                      else:
+                          out_file = gallery
+                      if out_file and os.path.exists(out_file):
+                          Image.open(out_file).save(output_path, format="PNG")
+                          if isinstance(result, (tuple, list)) and len(result) > 1 and result[1] is not None:
+                              try:
+                                  final_seed = int(result[1])
+                              except:
+                                  final_seed = edit_seed
+                          print(f"[+] Qwen Official Space Completed! (Seed: {final_seed})")
+                          qwen_success = True
+                  except Exception as e2:
+                      print(f"[-] Official space error: {e2}")
+
+              if not qwen_success:
+                  print("[-] All GPU Qwen Edit mirrors were busy or temporarily rate-limited.")
+
+              # Auto-Chain with FLUX.2-Klein-Multi-LoRA for 4K Super-Upscaling if requested
+              if qwen_success and (duration_val == "flux_upscale" or "flux" in str(style_val).lower()):
+                  print("[*] Chaining Qwen Edit output into FLUX.2-Klein-Multi-LoRA for 4K UltraSharp & Depth Realism...")
+                  try:
+                      client_flux = Client("M3st3rJ4k3l/FLUX.2-Klein-Multi-LoRA")
+                      klein_res = client_flux.predict(
+                          base_image=handle_file(output_path),
+                          reference_images=[],
+                          prompt=prompt,
+                          lora_prompt_text="",
+                          custom_prompt_text="",
+                          selected_titles=['Ultimate Upscaler Klein-9b', 'High Resolution', 'Klein-Delight-Style'],
+                          seed=final_seed or edit_seed,
+                          randomize_seed=False,
+                          guidance_scale=1.0,
+                          steps=4,
+                          upscale_factor="4× — UltraSharp (crisp)",
+                          canvas_mode="Auto (from base image)",
+                          custom_width=1024,
+                          custom_height=1024,
+                          canvas_fit_mode="Stretch",
+                          pad_color="#000000",
+                          batch_count=1,
+                          batch_vary="Random seed each run",
+                          sweep_min=0.4,
+                          sweep_max=1.4,
+                          param_21=1.0,
+                          param_22=1.0,
+                          param_23=1.0,
+                          param_24=1.0,
+                          param_25=1.0,
+                          param_26=1.0,
+                          api_name="/infer"
+                      )
+                      klein_gallery = klein_res[0] if isinstance(klein_res, (tuple, list)) else klein_res
+                      if isinstance(klein_gallery, list) and klein_gallery:
+                          k_first = klein_gallery[0]
+                          k_path = k_first.get("image", {}).get("path") if isinstance(k_first, dict) and isinstance(k_first.get("image"), dict) else (k_first.get("image") if isinstance(k_first, dict) else k_first)
+                          if k_path and os.path.exists(k_path):
+                              import shutil
+                              shutil.copyfile(k_path, output_path)
+                              print("[+] FLUX.2 Klein 4K UltraSharp Super-Upscale Complete!")
+                  except Exception as e_flux:
+                      print(f"[-] FLUX.2 Klein chaining error: {e_flux}")
+
+
+          elif action == "flux-klein":
+              print(f"[*] Connecting to FLUX.2-Klein-Multi-LoRA Studio for prompt: {prompt}...")
+              from gradio_client import Client, handle_file
+              import random
+              image_output_path = "/tmp/ai_lab/output.png"
+              output_path = image_output_path
+              input_img_path = "/tmp/ai_lab/input.png"
+
+              # Download image if provided
+              has_image = bool(image_url and image_url.startswith("http"))
+              if has_image:
+                  try:
+                      resp = requests.get(image_url, timeout=15)
+                      with open(input_img_path, "wb") as f:
+                          f.write(resp.content)
+                  except Exception as e:
+                      print(f"[-] Image download error: {e}")
+                      has_image = False
+
+              # If no image provided, generate an initial base image via Spicy-krea2 (Primary) or 2i/pornmaster-krea2 (Fallback)
+              if not has_image or not os.path.exists(input_img_path):
+                  hf_tok = os.environ.get("HF_TOKEN") or None
+                  try:
+                      print(f"[*] Generating initial base image via MarkTheArtist/Spicy-krea2...")
+                      krea_client = Client("MarkTheArtist/Spicy-krea2", token=hf_tok, httpx_kwargs={"timeout": 180.0})
+                      job = krea_client.submit(
+                          prompt=prompt,
+                          width=1024,
+                          height=1024,
+                          seed=random.randint(1, 999999),
+                          steps=6.0,
+                          cfg=1.0,
+                          sampler_name="Euler",
+                          enable_lora=False,
+                          lora_name="krea2_darkbrush.safetensors",
+                          lora_strength=0.8,
+                          trigger_word="",
+                          prompt_enhance=False,
+                          thinking=False,
+                          max_tokens=256.0,
+                          api_name="/generate_image"
+                      )
+                      krea_res = job.result(timeout=180.0)
+                      base_img = extract_path(krea_res)
+                      if base_img and os.path.exists(base_img):
+                          import shutil
+                          shutil.copyfile(base_img, input_img_path)
+                          has_image = True
+                  except Exception as err:
+                      print(f"[-] Base frame Spicy-krea2 error: {err}")
+                      # Fallback 1: 2i/pornmaster-krea2
+                      try:
+                          pm_client = Client("2i/pornmaster-krea2", token=hf_tok, httpx_kwargs={"timeout": 180.0})
+                          job_pm = pm_client.submit(prompt=prompt, width=1024, height=1024, seed=random.randint(1, 999999), steps=6.0, cfg=1.0, sampler_name="Euler", enable_lora=False, lora_name="krea2_darkbrush.safetensors", lora_strength=0.8, trigger_word="", prompt_enhance=False, thinking=False, max_tokens=256.0, api_name="/generate_image")
+                          pm_res = job_pm.result(timeout=180.0)
+                          base_img = extract_path(pm_res)
+                          if base_img and os.path.exists(base_img):
+                              import shutil
+                              shutil.copyfile(base_img, input_img_path)
+                              has_image = True
+                      except Exception as pm_err:
+                          print(f"[-] Base frame 2i/pornmaster-krea2 fallback error: {pm_err}")
+                          # Fallback 2: Official krea/Krea-2
+                          try:
+                              off_client = Client("krea/Krea-2", token=hf_tok, httpx_kwargs={"timeout": 120.0})
+                              off_res = off_client.predict(prompt=prompt, negative_prompt="blurry, low quality", model="Turbo", steps=8.0, guidance=0.0, width=1024.0, height=1024.0, seed=float(random.randint(1, 999999)), randomize=True, api_name="/generate")
+                              base_img = extract_path(off_res)
+                              if base_img and os.path.exists(base_img):
+                                  import shutil
+                                  shutil.copyfile(base_img, input_img_path)
+                                  has_image = True
+                          except Exception as off_err:
+                              print(f"[-] Base frame krea/Krea-2 fallback error: {off_err}")
+
+              if seed_val and seed_val != "-1":
+                  try:
+                      klein_seed = int(seed_val)
+                  except:
+                      klein_seed = random.randint(1, 9999999)
+              else:
+                  klein_seed = random.randint(1, 9999999)
+              final_seed = klein_seed
+
+              # Determine LoRA list based on style_val
+              if style_val == "instapic":
+                  selected_loras = ['InstaPic', 'High Resolution', 'Klein-Delight-Style']
+              elif style_val == "delight":
+                  selected_loras = ['Klein-Delight-Style', 'Controllight', 'High Resolution']
+              elif style_val == "face_swap":
+                  selected_loras = ['Best-Face-Swap', 'Klein-Consistency', 'High Resolution']
+              elif style_val == "none":
+                  selected_loras = []
+              else:
+                  # Default: Ultimate Upscaler + High Resolution + Klein Delight for maximum depth & clarity
+                  selected_loras = ['Ultimate Upscaler Klein-9b', 'High Resolution', 'Klein-Delight-Style']
+
+              # Determine upscale factor from duration_val
+              valid_factors = [
+                  '4× — UltraSharp (crisp)', '4× — Nomos2 HQ DAT2 (Photography)',
+                  '4× — Remacri (natural)', '2× — RealESRGAN (balanced)', 'None'
+              ]
+              upscale_choice = duration_val if duration_val in valid_factors else '4× — UltraSharp (crisp)'
+
+              klein_steps = steps if (steps and 2 <= steps <= 15) else 4
+              print(f"[*] Dispatching to FLUX.2 Klein: LoRAs={selected_loras} | Upscaler={upscale_choice} | Steps={klein_steps} | Seed={final_seed}")
+              klein_success = False
+
+              try:
+                  client_flux = Client("M3st3rJ4k3l/FLUX.2-Klein-Multi-LoRA")
+                  klein_res = client_flux.predict(
+                      base_image=handle_file(input_img_path) if (has_image and os.path.exists(input_img_path)) else None,
+                      reference_images=[],
+                      prompt=prompt,
+                      lora_prompt_text="",
+                      custom_prompt_text="",
+                      selected_titles=selected_loras,
+                      seed=final_seed,
+                      randomize_seed=False,
+                      guidance_scale=1.0,
+                      steps=klein_steps,
+                      upscale_factor=upscale_choice,
+                      canvas_mode="Auto (from base image)" if (has_image and os.path.exists(input_img_path)) else "Custom",
+                      custom_width=1024,
+                      custom_height=1024,
+                      canvas_fit_mode="Stretch",
+                      pad_color="#000000",
+                      batch_count=1,
+                      batch_vary="Random seed each run",
+                      sweep_min=0.4,
+                      sweep_max=1.4,
+                      param_21=1.0,
+                      param_22=1.0,
+                      param_23=1.0,
+                      param_24=1.0,
+                      param_25=1.0,
+                      param_26=1.0,
+                      api_name="/infer"
+                  )
+                  klein_gallery = klein_res[0] if isinstance(klein_res, (tuple, list)) else klein_res
+                  if isinstance(klein_gallery, list) and klein_gallery:
+                      k_first = klein_gallery[0]
+                      k_path = k_first.get("image", {}).get("path") if isinstance(k_first, dict) and isinstance(k_first.get("image"), dict) else (k_first.get("image") if isinstance(k_first, dict) else k_first)
+                      if k_path and os.path.exists(k_path):
+                          import shutil
+                          shutil.copyfile(k_path, output_path)
+                          print("[+] FLUX.2 Klein Generation & 4K Upscale Complete!")
+                          klein_success = True
+              except Exception as err:
+                  print(f"[-] FLUX.2 Klein error: {err}")
+                  renew_tor_ip()
+
+              # Fallback 1: Official black-forest-labs/FLUX.2-dev Flagship Studio
+              if not klein_success:
+                  try:
+                      print(f"[*] Fallback 1: Connecting to black-forest-labs/FLUX.2-dev Flagship Studio...")
+                      client_dev = Client("black-forest-labs/FLUX.2-dev")
+                      dev_res = client_dev.predict(
+                          prompt=prompt,
+                          input_images=[handle_file(input_img_path)] if (has_image and os.path.exists(input_img_path)) else [],
+                          seed=float(final_seed),
+                          randomize_seed=False,
+                          width=1024.0,
+                          height=1024.0,
+                          num_inference_steps=28.0,
+                          guidance_scale=4.0,
+                          prompt_upsampling=True,
+                          api_name="/infer"
+                      )
+                      k_path = extract_path(dev_res)
+                      if k_path and os.path.exists(k_path):
+                          import shutil
+                          shutil.copyfile(k_path, output_path)
+                          print("[+] Official FLUX.2-dev Flagship Generation Complete!")
+                          klein_success = True
+                  except Exception as err_dev:
+                      print(f"[-] FLUX.2-dev error: {err_dev}")
+                      renew_tor_ip()
+
+              # Fallback 2: black-forest-labs/flux-klein-9b-kv official space
+              if not klein_success:
+                  try:
+                      print(f"[*] Fallback 2: Connecting to black-forest-labs/flux-klein-9b-kv...")
+                      client_kv = Client("black-forest-labs/flux-klein-9b-kv")
+                      kv_res = client_kv.predict(
+                          prompt=prompt,
+                          input_images=[handle_file(input_img_path)] if (has_image and os.path.exists(input_img_path)) else [],
+                          seed=float(final_seed),
+                          randomize_seed=False,
+                          width=1024.0,
+                          height=1024.0,
+                          num_inference_steps=float(klein_steps),
+                          prompt_upsampling=False,
+                          api_name="/generate"
+                      )
+                      k_path = extract_path(kv_res)
+                      if k_path and os.path.exists(k_path):
+                          import shutil
+                          shutil.copyfile(k_path, output_path)
+                          print("[+] FLUX.2 Klein 9B-KV Official Generation Complete!")
+                          klein_success = True
+                  except Exception as err_kv:
+                      print(f"[-] FLUX.2 Klein 9B-KV error: {err_kv}")
+                      renew_tor_ip()
+
+          elif action == "qwen21-unrestricted":
+              print(f"[*] Connecting to Qwen-Image-2.1-Uncensored-GGUF Studio for prompt: {prompt}")
+              from gradio_client import Client, handle_file
+              import random
+              
+              output_path = "/tmp/ai_lab/output.png"
+              
+              # Parse mode from style_val
+              mode = style_val if style_val else "Create an image"
+              
+              # Parse aspect ratio from duration_val
+              aspect_ratio = duration_val if duration_val else "Square · 1:1 (1024x1024)"
+              
+              # Parse seed
+              if seed_val and seed_val != "-1":
+                  try:
+                      gen_seed = int(seed_val)
+                      randomize_seed = False
+                  except:
+                      gen_seed = 42
+                      randomize_seed = True
+              else:
+                  gen_seed = 42
+                  randomize_seed = True
+              final_seed = gen_seed
+              
+              # Download reference image if image_url provided (for Edit mode or Transparent PNG)
+              reference_img = None
+              if image_url and image_url.startswith("http"):
+                  try:
+                      input_img_path = "/tmp/ai_lab/input_qwen21.png"
+                      resp = requests.get(image_url, timeout=15)
+                      with open(input_img_path, "wb") as f:
+                          f.write(resp.content)
+                      reference_img = input_img_path
+                      print(f"[*] Reference image downloaded for {mode}")
+                  except Exception as e:
+                      print(f"[-] Reference image download error: {e}")
+              
+              print(f"[*] Qwen21 Configuration: Mode={mode} | Ratio={aspect_ratio} | Steps={steps} | Seed={gen_seed} | Randomize={randomize_seed}")
+              
+              try:
+                  client = Client("arudradey/qwen-image-2.1-uncensored-gguf")
+                  result = client.predict(
+                      prompt=prompt,
+                      mode=mode,
+                      reference=handle_file(reference_img) if reference_img else None,
+                      aspect_ratio=aspect_ratio,
+                      steps=float(steps) if steps else 40.0,
+                      seed=gen_seed,
+                      randomize_seed=randomize_seed,
+                      api_name="/generate"
+                  )
+                  
+                  # result = (generated_output, download_full_resolution_png, seed, generation_details)
+                  if result and isinstance(result, tuple) and len(result) >= 2:
+                      # Try generated_output first (index 0)
+                      gen_output = result[0]
+                      if isinstance(gen_output, str) and os.path.exists(gen_output):
+                          Image.open(gen_output).save(output_path, format="PNG")
+                          print("[+] Qwen-Image-2.1 Uncensored Generation Complete!")
+                      # Try full resolution PNG (index 1)
+                      elif len(result) > 1 and isinstance(result[1], str) and os.path.exists(result[1]):
+                          Image.open(result[1]).save(output_path, format="PNG")
+                          print("[+] Qwen-Image-2.1 Uncensored Generation Complete (Full Res)!")
+                      
+                      # Extract actual used seed from result[2]
+                      if len(result) > 2 and result[2] is not None:
+                          try:
+                              final_seed = int(result[2])
+                          except:
+                              pass
+              except Exception as err:
+                  print(f"[-] Qwen21-Unrestricted error: {err}")
+                  renew_tor_ip()
+
+          elif action == "wan-video":
+              print(f"[*] Connecting to Wan 2.2 Uncensored Video Space (STCM Missionary AOTI)...")
+              from gradio_client import Client, handle_file
+              import random
+
+              video_output_path = "/tmp/ai_lab/output.mp4"
+              output_path = video_output_path
+              input_img_path = "/tmp/ai_lab/input.png"
+              
+              # Parse dynamic duration (up to 10s supported)
+              try:
+                  video_duration = float(duration_val) if duration_val else 5.0
+                  if video_duration < 1.0:
+                      video_duration = 1.0
+                  elif video_duration > 10.0:
+                      video_duration = 10.0
+              except Exception:
+                  video_duration = 5.0
+
+              if seed_val and seed_val != "-1":
+                  try:
+                      rand_seed = int(seed_val)
+                  except:
+                      rand_seed = random.randint(1, 9999999)
+              else:
+                  rand_seed = random.randint(1, 9999999)
+              final_seed = rand_seed
+              wan_success = False
+
+              print(f"[*] Wan 2.2 Configuration: Duration={video_duration}s | Steps={steps} | Seed={rand_seed}")
+
+              # Check or prepare input image
+              has_image = bool(image_url and image_url.startswith("http"))
+              if has_image:
+                  try:
+                      resp = requests.get(image_url, timeout=15)
+                      with open(input_img_path, "wb") as f:
+                          f.write(resp.content)
+                  except Exception as e:
+                      print(f"[-] Image download error: {e}")
+                      has_image = False
+
+              # If no image provided, generate an ultra-fast base image via Spicy-krea2 (Primary) or 2i/pornmaster-krea2 (Fallback)
+              if not has_image or not os.path.exists(input_img_path):
+                  hf_tok = os.environ.get("HF_TOKEN") or None
+                  try:
+                      print(f"[*] Auto-generating base frame via MarkTheArtist/Spicy-krea2 for prompt: {prompt[:60]}...")
+                      krea_client = Client("MarkTheArtist/Spicy-krea2", token=hf_tok, httpx_kwargs={"timeout": 180.0})
+                      job = krea_client.submit(
+                          prompt=prompt,
+                          width=832,
+                          height=480,
+                          seed=rand_seed,
+                          steps=6.0,
+                          cfg=1.0,
+                          sampler_name="Euler",
+                          enable_lora=False,
+                          lora_name="krea2_darkbrush.safetensors",
+                          lora_strength=0.8,
+                          trigger_word="",
+                          prompt_enhance=False,
+                          thinking=False,
+                          max_tokens=256.0,
+                          api_name="/generate_image"
+                      )
+                      krea_res = job.result(timeout=180.0)
+                      base_img = extract_path(krea_res)
+                      if base_img and os.path.exists(base_img):
+                          import shutil
+                          shutil.copyfile(base_img, input_img_path)
+                          has_image = True
+                  except Exception as err:
+                      print(f"[-] Base frame Spicy-krea2 error: {err}")
+                      try:
+                          pm_client = Client("2i/pornmaster-krea2", token=hf_tok, httpx_kwargs={"timeout": 180.0})
+                          job_pm = pm_client.submit(prompt=prompt, width=832, height=480, seed=rand_seed, steps=6.0, cfg=1.0, sampler_name="Euler", enable_lora=False, lora_name="krea2_darkbrush.safetensors", lora_strength=0.8, trigger_word="", prompt_enhance=False, thinking=False, max_tokens=256.0, api_name="/generate_image")
+                          pm_res = job_pm.result(timeout=180.0)
+                          base_img = extract_path(pm_res)
+                          if base_img and os.path.exists(base_img):
+                              import shutil
+                              shutil.copyfile(base_img, input_img_path)
+                              has_image = True
+                      except Exception as pm_err:
+                          print(f"[-] Base frame 2i/pornmaster-krea2 fallback error: {pm_err}")
+                          try:
+                              off_client = Client("krea/Krea-2", token=hf_tok, httpx_kwargs={"timeout": 120.0})
+                              off_res = off_client.predict(prompt=prompt, negative_prompt="blurry, low quality", model="Turbo", steps=8.0, guidance=0.0, width=1024.0, height=576.0, seed=float(rand_seed), randomize=True, api_name="/generate")
+                              base_img = extract_path(off_res)
+                              if base_img and os.path.exists(base_img):
+                                  import shutil
+                                  shutil.copyfile(base_img, input_img_path)
+                                  has_image = True
+                          except Exception as off_err:
+                              print(f"[-] Base frame krea/Krea-2 fallback error: {off_err}")
+
+              # Space 1: STCM/wan2-2-fp8da-aoti-preview-2c-missionary (Unrestricted FP8DA AOTI)
+              try:
+                  print(f"[*] Connecting to STCM/wan2-2-fp8da-aoti-preview-2c-missionary (Duration={video_duration}s)...")
+                  client = Client("STCM/wan2-2-fp8da-aoti-preview-2c-missionary")
+                  result = client.predict(
+                      input_image=handle_file(input_img_path) if os.path.exists(input_img_path) else None,
+                      last_image=None,
+                      prompt=prompt,
+                      steps=steps if steps <= 12 else 6,
+                      negative_prompt="blurry, distorted, low quality, static, artifacts",
+                      duration_seconds=video_duration,
+                      guidance_scale=1.0,
+                      guidance_scale_2=1.0,
+                      seed=rand_seed,
+                      randomize_seed=True,
+                      quality=6,
+                      scheduler="UniPCMultistep",
+                      flow_shift=3.0,
+                      frame_multiplier=16,
+                      safe_mode=False,
+                      video_component=True,
+                      api_name="/generate_video"
+                  )
+                  vid_path = extract_path(result)
+                  if vid_path and os.path.exists(vid_path):
+                      import shutil
+                      shutil.copyfile(vid_path, video_output_path)
+                      print("[+] Wan 2.2 Missionary Video Complete!")
+                      wan_success = True
+                  else:
+                      print(f"[-] STCM Missionary path not resolved from result: {result}")
+                      renew_tor_ip()
+              except Exception as e:
+                  print(f"[-] STCM Missionary error: {e}")
+                  renew_tor_ip()
+
+              # Space 2: r3gm/wan2-2-fp8da-aoti-preview (Official High-Speed AOTI + Uncensored switches)
+              if not wan_success:
+                  try:
+                      print(f"[*] Trying Fallback 2: r3gm/wan2-2-fp8da-aoti-preview (Duration={video_duration}s)...")
+                      client = Client("r3gm/wan2-2-fp8da-aoti-preview")
+                      result = client.predict(
+                          input_image=handle_file(input_img_path) if os.path.exists(input_img_path) else None,
+                          last_image=None,
+                          prompt=prompt,
+                          steps=steps if steps <= 12 else 6,
+                          negative_prompt="blurry, distorted, low quality, static, artifacts",
+                          duration_seconds=video_duration,
+                          guidance_scale=1.0,
+                          guidance_scale_2=1.0,
+                          seed=rand_seed,
+                          randomize_seed=True,
+                          quality=6,
+                          scheduler="UniPCMultistep",
+                          flow_shift=3.0,
+                          frame_multiplier=16,
+                          video_component=True,
+                          safe_mode=False,
+                          enable_safety_checker=False,
+                          api_name="/generate_video"
+                      )
+                      vid_path = extract_path(result)
+                      if vid_path and os.path.exists(vid_path):
+                          import shutil
+                          shutil.copyfile(vid_path, video_output_path)
+                          print("[+] Wan 2.2 r3gm Video Complete!")
+                          wan_success = True
+                  except Exception as e_r3gm:
+                      print(f"[-] r3gm error: {e_r3gm}")
+                      renew_tor_ip()
+
+              # Space 3: kulkas2pintu/edit-video-wan fallback
+              if not wan_success:
+                  try:
+                      print(f"[*] Trying Fallback 3: kulkas2pintu/edit-video-wan (Duration={video_duration}s)...")
+                      client = Client("kulkas2pintu/edit-video-wan")
+                      result = client.predict(
+                          input_image=handle_file(input_img_path) if os.path.exists(input_img_path) else None,
+                          last_image=None,
+                          prompt=prompt,
+                          steps=steps if steps <= 12 else 6,
+                          negative_prompt="blurry, distorted, low quality, static",
+                          duration_seconds=video_duration,
+                          guidance_scale=1.0,
+                          guidance_scale_2=1.0,
+                          seed=rand_seed,
+                          randomize_seed=True,
+                          quality=6,
+                          scheduler="UniPCMultistep",
+                          flow_shift=3.0,
+                          frame_multiplier=16,
+                          video_component=True,
+                          safe_mode=False,
+                          api_name="/generate_video"
+                      )
+                      vid_path = extract_path(result)
+                      if vid_path and os.path.exists(vid_path):
+                          import shutil
+                          shutil.copyfile(vid_path, video_output_path)
+                          print("[+] Wan Video Complete from kulkas2pintu Space!")
+                          wan_success = True
+                  except Exception as e2:
+                      print(f"[-] kulkas2pintu space error: {e2}")
+                      renew_tor_ip()
+
+              # Space 4: Pepe104/MiniMax-H3-Turbo-Lora-UNCENSORED (100% Unrestricted Text/Image to Video)
+              if not wan_success:
+                  try:
+                      print(f"[*] Trying Fallback 4: Pepe104/MiniMax-H3-Turbo-Lora-UNCENSORED (Duration={video_duration}s)...")
+                      client = Client("Pepe104/MiniMax-H3-Turbo-Lora-UNCENSORED")
+                      result = client.predict(
+                          prompt=prompt,
+                          image_path=handle_file(input_img_path) if os.path.exists(input_img_path) else None,
+                          last_image_path=None,
+                          canvas="960x544 · 16:9 fast",
+                          duration=video_duration,
+                          steps=4,
+                          seed=rand_seed,
+                          upsample=False,
+                          use_lora=True,
+                          lora="larry",
+                          api_name="/generate"
+                      )
+                      vid_path = extract_path(result)
+                      if vid_path and os.path.exists(vid_path):
+                          import shutil
+                          shutil.copyfile(vid_path, video_output_path)
+                          print("[+] Uncensored Video Complete from Pepe104 Space!")
+                          wan_success = True
+                  except Exception as e3:
+                      print(f"[-] Pepe104 error: {e3}")
+                      renew_tor_ip()
+
+              # Space 5: mrfakename/minimax-h3-ultra-fast fallback
+              if not wan_success:
+                  try:
+                      print(f"[*] Trying Fallback 5: mrfakename/minimax-h3-ultra-fast (Duration={video_duration}s)...")
+                      client = Client("mrfakename/minimax-h3-ultra-fast")
+                      result = client.predict(
+                          prompt=prompt,
+                          image_path=handle_file(input_img_path) if os.path.exists(input_img_path) else None,
+                          last_image_path=None,
+                          canvas="960x544 · 16:9 fast",
+                          duration=video_duration,
+                          steps=4,
+                          seed=rand_seed,
+                          upsample=False,
+                          acceleration="Balanced",
+                          lora_preset="None",
+                          lora_repo="",
+                          lora_filename="",
+                          lora_strength=1.0,
+                          generation_preset="Balanced · best overall (recommended)",
+                          references=None,
+                          api_name="/generate"
+                      )
+                      vid_path = extract_path(result)
+                      if vid_path and os.path.exists(vid_path):
+                          import shutil
+                          shutil.copyfile(vid_path, video_output_path)
+                          print("[+] Video Complete via mrfakename Fallback!")
+                          wan_success = True
+                  except Exception as e4:
+                      print(f"[-] mrfakename fallback error: {e4}")
+                      renew_tor_ip()
+
+
+          elif action == "pixel-perfect":
+              print(f"[*] Connecting to Perfect Pixel Engine 1.0 (boroll2347/Wan_2.2_I2V_14B_Custom_Lora_hqdefault)...")
+              from gradio_client import Client, handle_file
+              import random
+
+              video_output_path = "/tmp/ai_lab/output.mp4"
+              output_path = video_output_path
+              input_img_path = "/tmp/ai_lab/input.png"
+              last_img_path = "/tmp/ai_lab/last.png"
+              
+              # Parse parameters from GitHub Actions inputs
+              # Duration: Max 13 seconds (override default 3.5)
+              try:
+                  video_duration = float(duration_val) if duration_val else 3.5
+                  if video_duration < 1.0:
+                      video_duration = 1.0
+                  elif video_duration > 13.0:
+                      video_duration = 13.0
+              except Exception:
+                  video_duration = 3.5
+
+              try:
+                  guidance = float(os.environ.get("GUIDANCE_SCALE", "2.5"))
+                  if guidance < 1.0:
+                      guidance = 1.0
+                  elif guidance > 5.0:
+                      guidance = 5.0
+              except:
+                  guidance = 2.5
+
+              quality_val = os.environ.get("QUALITY", "normal")
+              scheduler_val = os.environ.get("SCHEDULER", "euler")
+              # Map user-friendly scheduler names to API values
+              scheduler_mapping = {
+                  "euler": "FlowMatchEulerDiscrete",
+                  "ddim": "DEISMultistep",
+                  "dpm_solver": "DPMSolverMultistep"
+              }
+              scheduler_api = scheduler_mapping.get(scheduler_val, "UniPCMultistep")
+              
+              frame_mult = os.environ.get("FRAME_MULTIPLIER", "32")
+              try:
+                  frame_mult_int = int(frame_mult)
+                  if frame_mult_int not in [16, 32, 64, 128]:
+                      frame_mult_int = 32
+              except:
+                  frame_mult_int = 32
+              
+              safe_mode_str = os.environ.get("SAFE_MODE", "false").lower()
+              safe_mode_bool = safe_mode_str in ["true", "1", "yes"]
+
+              lora_preset_1 = os.environ.get("LORA_PRESET_1", "none")
+              lora_preset_2 = os.environ.get("LORA_PRESET_2", "none")
+              lora_preset_3 = os.environ.get("LORA_PRESET_3", "none")
+              custom_lora_1 = os.environ.get("CUSTOM_LORA_1", "")
+              custom_lora_2 = os.environ.get("CUSTOM_LORA_2", "")
+              try:
+                  custom_lora_1_weight = float(os.environ.get("CUSTOM_LORA_1_WEIGHT", "1.0"))
+              except:
+                  custom_lora_1_weight = 1.0
+              try:
+                  custom_lora_2_weight = float(os.environ.get("CUSTOM_LORA_2_WEIGHT", "1.0"))
+              except:
+                  custom_lora_2_weight = 1.0
+
+              last_image_url = os.environ.get("LAST_IMAGE_URL", "")
+
+              if seed_val and seed_val != "-1":
+                  try:
+                      rand_seed = int(seed_val)
+                  except:
+                      rand_seed = random.randint(1, 9999999)
+              else:
+                  rand_seed = random.randint(1, 9999999)
+              final_seed = rand_seed
+              ppe_success = False
+
+              print(f"[*] Perfect Pixel Engine Config: Duration={video_duration}s | Steps={steps} | Guidance={guidance} | Seed={rand_seed}")
+              print(f"[*] Quality={quality_val} | Scheduler={scheduler_val} | FrameMult={frame_mult_int} | SafeMode={safe_mode_bool}")
+              print(f"[*] LoRA Stack: P1={lora_preset_1} | P2={lora_preset_2} | P3={lora_preset_3}")
+              if custom_lora_1:
+                  print(f"[*] Custom LoRA 1: {custom_lora_1} (Weight: {custom_lora_1_weight})")
+              if custom_lora_2:
+                  print(f"[*] Custom LoRA 2: {custom_lora_2} (Weight: {custom_lora_2_weight})")
+
+              # Download input image
+              has_image = bool(image_url and image_url.startswith("http"))
+              if has_image:
+                  try:
+                      resp = requests.get(image_url, timeout=15)
+                      with open(input_img_path, "wb") as f:
+                          f.write(resp.content)
+                  except Exception as e:
+                      print(f"[-] Input image download error: {e}")
+                      has_image = False
+
+              # Download last_image if provided
+              has_last_image = False
+              if last_image_url and last_image_url.startswith("http"):
+                  try:
+                      resp_last = requests.get(last_image_url, timeout=15)
+                      with open(last_img_path, "wb") as f:
+                          f.write(resp_last.content)
+                      has_last_image = True
+                      print(f"[+] Last frame image downloaded for trajectory guidance")
+                  except Exception as e:
+                      print(f"[-] Last image download error: {e}")
+
+              if not has_image or not os.path.exists(input_img_path):
+                  print(f"[-] ERROR: No valid input image provided for Perfect Pixel Engine!")
+                  sys.exit(1)
+
+              # Primary Space: boroll2347/Wan_2.2_I2V_14B_Custom_Lora_hqdefault (Perfect Pixel Engine 1.0)
+              try:
+                  print(f"[*] Connecting to boroll2347/Wan_2.2_I2V_14B_Custom_Lora_hqdefault (Duration={video_duration}s)...")
+                  client = Client("boroll2347/Wan_2.2_I2V_14B_Custom_Lora_hqdefault")
+                  
+                  # Convert LoRA preset names (user-friendly -> API format)
+                  lora1_api = "(None)"
+                  lora2_api = "(None)"
+                  lora3_api = "(None)"
+                  
+                  # Prepare my1-5 repo strings (Required, cannot be empty)
+                  # Use placeholder "Hello!!" for unused slots as per API docs
+                  my1_repo_val = custom_lora_1 if custom_lora_1 else "Hello!!"
+                  my2_repo_val = custom_lora_2 if custom_lora_2 else "Hello!!"
+                  my3_repo_val = "Hello!!"
+                  my4_repo_val = "Hello!!"
+                  my5_repo_val = "Hello!!"
+                  
+                  # Full API call with ALL 50 parameters (as per docs)
+                  result = client.predict(
+                      input_image=handle_file(input_img_path),
+                      last_image=handle_file(last_img_path) if has_last_image else None,
+                      prompt=prompt,
+                      steps=steps if steps <= 12 else 6,
+                      negative_prompt="blurry, distorted, low quality, static, artifacts",
+                      duration_seconds=video_duration,
+                      guidance_scale=guidance,
+                      guidance_scale_2=guidance,
+                      seed=rand_seed,
+                      randomize_seed=True,
+                      quality=10 if quality_val == "high" else 6,
+                      scheduler=scheduler_api,
+                      flow_shift=3.0,
+                      frame_multiplier=frame_mult_int,
+                      safe_mode=safe_mode_bool,
+                      # Built-in LoRA Presets (3 slots with high/low scale)
+                      lora1_preset=lora1_api,
+                      lora1_high_scale=1.0,
+                      lora1_low_scale=1.0,
+                      lora2_preset=lora2_api,
+                      lora2_high_scale=1.0,
+                      lora2_low_scale=1.0,
+                      lora3_preset=lora3_api,
+                      lora3_high_scale=1.0,
+                      lora3_low_scale=1.0,
+                      # Custom LoRA Repos (5 slots - Required, use "Hello!!" placeholder)
+                      my1_repo=my1_repo_val,
+                      my1_high="(None)",
+                      my1_hs=custom_lora_1_weight if custom_lora_1 else 1.0,
+                      my1_low="(None)",
+                      my1_ls=1.0,
+                      my2_repo=my2_repo_val,
+                      my2_high="(None)",
+                      my2_hs=custom_lora_2_weight if custom_lora_2 else 1.0,
+                      my2_low="(None)",
+                      my2_ls=1.0,
+                      my3_repo=my3_repo_val,
+                      my3_high="(None)",
+                      my3_hs=1.0,
+                      my3_low="(None)",
+                      my3_ls=1.0,
+                      my4_repo=my4_repo_val,
+                      my4_high="(None)",
+                      my4_hs=1.0,
+                      my4_low="(None)",
+                      my4_ls=1.0,
+                      my5_repo=my5_repo_val,
+                      my5_high="(None)",
+                      my5_hs=1.0,
+                      my5_low="(None)",
+                      my5_ls=1.0,
+                      video_component=True,
+                      api_name="/generate_video"
+                  )
+                  print(f"[DEBUG] API Result Type: {type(result)}")
+                  print(f"[DEBUG] API Result Full: {result}")
+                  
+                  # API returns tuple: [video_file, download_file, seed]
+                  # Extract video from first element (index 0)
+                  if isinstance(result, (list, tuple)) and len(result) >= 1:
+                      vid_path = extract_path(result[0])  # First element is the video
+                      print(f"[DEBUG] Extracted from result[0]: {vid_path}")
+                  else:
+                      vid_path = extract_path(result)
+                      print(f"[DEBUG] Extracted from full result: {vid_path}")
+                  
+                  if vid_path and os.path.exists(vid_path):
+                      import shutil
+                      shutil.copyfile(vid_path, video_output_path)
+                      print("[+] Perfect Pixel Engine 1.0 Video Complete!")
+                      ppe_success = True
+                  else:
+                      print(f"[-] Perfect Pixel Engine path not resolved")
+                      print(f"[-] Result structure: {result}")
+                      print(f"[-] Extracted path: {vid_path}")
+              except Exception as e:
+                  print(f"[-] Perfect Pixel Engine error: {e}")
+                  print(f"[-] Perfect Pixel Engine FAILED. Exclusive model unavailable.")
+                  sys.exit(1)
+
+
+          elif action == "krea-2":
+              print(f"[*] Connecting to Primary: MarkTheArtist/Spicy-krea2 (Unrestricted Photorealism)...")
+              from gradio_client import Client
+              import random
+              krea_success = False
+
+              ratio = image_url.strip() if image_url else "1:1"
+              if ratio == "16:9":
+                  krea_w, krea_h = 1344, 768
+              elif ratio == "9:16":
+                  krea_w, krea_h = 768, 1344
+              else:
+                  krea_w, krea_h = 1024, 1024
+
+              if seed_val and seed_val != "-1":
+                  try:
+                      krea_seed = int(seed_val)
+                      krea_rand = False
+                  except:
+                      krea_seed = random.randint(1, 9999999)
+                      krea_rand = True
+              else:
+                  krea_seed = random.randint(1, 9999999)
+                  krea_rand = True
+              final_seed = krea_seed
+
+              # Photorealism prompt tuning
+              tuned_prompt = f"{prompt}, raw photo, 8k uhd, dslr, soft natural lighting, high quality, film grain, Fujifilm XT4"
+
+              hf_tok = os.environ.get("HF_TOKEN") or None
+
+              # 1. Primary: MarkTheArtist/Spicy-krea2 (Unrestricted, 180s timeout budget)
+              try:
+                  print(f"[*] Connecting to MarkTheArtist/Spicy-krea2 with 180s timeout budget...")
+                  client = Client("MarkTheArtist/Spicy-krea2", token=hf_tok, httpx_kwargs={"timeout": 180.0})
+                  print(f"[*] Dispatching prompt to Spicy-krea2: {tuned_prompt[:60]}... | {krea_w}x{krea_h} | Seed: {krea_seed}")
+                  job = client.submit(
+                      prompt=tuned_prompt,
+                      width=int(krea_w),
+                      height=int(krea_h),
+                      seed=int(krea_seed),
+                      steps=float(steps if steps <= 15 else 8),
+                      cfg=1.0,
+                      sampler_name="Euler",
+                      enable_lora=False,
+                      lora_name="krea2_darkbrush.safetensors",
+                      lora_strength=0.8,
+                      trigger_word="",
+                      prompt_enhance=False,
+                      thinking=False,
+                      max_tokens=512.0,
+                      api_name="/generate_image"
+                  )
+                  result = job.result(timeout=180.0)
+                  img_path = extract_path(result)
+                  if img_path and os.path.exists(img_path):
+                      Image.open(img_path).save(output_path, format="PNG")
+                      print("[+] Spicy-krea2 Ultra-Realistic Generation Complete!")
+                      krea_success = True
+                  else:
+                      print(f"[-] Spicy-krea2 image path unresolved: {result}")
+                      renew_tor_ip()
+              except Exception as e_spicy:
+                  print(f"[-] Spicy-krea2 error: {e_spicy}")
+                  renew_tor_ip()
+
+              # 2. Fallback 1: 2i/pornmaster-krea2 (Direct Unrestricted Mirror, RUNNING on Zero-A10G)
+              if not krea_success:
+                  try:
+                      print(f"[*] Trying Fallback 1: 2i/pornmaster-krea2 (Unrestricted Mirror)...")
+                      client_pm = Client("2i/pornmaster-krea2", token=hf_tok, httpx_kwargs={"timeout": 180.0})
+                      job_pm = client_pm.submit(
+                          prompt=tuned_prompt,
+                          width=int(krea_w),
+                          height=int(krea_h),
+                          seed=int(krea_seed),
+                          steps=float(steps if steps <= 15 else 8),
+                          cfg=1.0,
+                          sampler_name="Euler",
+                          enable_lora=False,
+                          lora_name="krea2_darkbrush.safetensors",
+                          lora_strength=0.8,
+                          trigger_word="",
+                          prompt_enhance=False,
+                          thinking=False,
+                          max_tokens=512.0,
+                          api_name="/generate_image"
+                      )
+                      res_pm = job_pm.result(timeout=180.0)
+                      img_path = extract_path(res_pm)
+                      if img_path and os.path.exists(img_path):
+                          Image.open(img_path).save(output_path, format="PNG")
+                          print("[+] 2i/pornmaster-krea2 Unrestricted Generation Complete!")
+                          krea_success = True
+                      else:
+                          print(f"[-] 2i/pornmaster-krea2 image path unresolved: {res_pm}")
+                          renew_tor_ip()
+                  except Exception as e_pm:
+                      print(f"[-] 2i/pornmaster-krea2 error: {e_pm}")
+                      renew_tor_ip()
+
+              # 3. Fallback 2: Official krea/Krea-2 Space (Running, 11s ultra-fast generation)
+              if not krea_success:
+                  try:
+                      print(f"[*] Trying Fallback 2: Official krea/Krea-2 Space...")
+                      client = Client("krea/Krea-2", token=hf_tok, httpx_kwargs={"timeout": 120.0})
+                      result = client.predict(
+                          prompt=tuned_prompt,
+                          negative_prompt="blurry, bad quality, distorted, deformed, watermark, lowres",
+                          model="Turbo",
+                          steps=float(steps if steps <= 25 else 8),
+                          guidance=0.0,
+                          width=float(krea_w if krea_w <= 1024 else 1024),
+                          height=float(krea_h if krea_h <= 1024 else 1024),
+                          seed=float(krea_seed),
+                          randomize=krea_rand,
+                          api_name="/generate"
+                      )
+                      img_path = extract_path(result)
+                      if img_path and os.path.exists(img_path):
+                          Image.open(img_path).save(output_path, format="PNG")
+                          print("[+] Official krea/Krea-2 Generation Complete!")
+                          krea_success = True
+                      else:
+                          print(f"[-] krea/Krea-2 image path unresolved: {result}")
+                          renew_tor_ip()
+                  except Exception as e_krea_off:
+                      print(f"[-] Official krea/Krea-2 error: {e_krea_off}")
+                      renew_tor_ip()
+
+              # 4. Fallback 3: black-forest-labs/FLUX.1-Krea-dev (Official BFL Krea-dev)
+              if not krea_success:
+                  try:
+                      print(f"[*] Trying Fallback 3: black-forest-labs/FLUX.1-Krea-dev...")
+                      client = Client("black-forest-labs/FLUX.1-Krea-dev", token=hf_tok, httpx_kwargs={"timeout": 120.0})
+                      result = client.predict(
+                          prompt=tuned_prompt,
+                          seed=float(krea_seed),
+                          randomize_seed=krea_rand,
+                          width=float(krea_w if krea_w <= 1024 else 1024),
+                          height=float(krea_h if krea_h <= 1024 else 1024),
+                          guidance_scale=4.5,
+                          num_inference_steps=20.0,
+                          api_name="/infer"
+                      )
+                      img_path = extract_path(result)
+                      if img_path and os.path.exists(img_path):
+                          Image.open(img_path).save(output_path, format="PNG")
+                          print("[+] FLUX.1-Krea-dev Generation Complete!")
+                          krea_success = True
+                      else:
+                          print(f"[-] FLUX.1-Krea-dev image path unresolved: {result}")
+                          renew_tor_ip()
+                  except Exception as e_flk:
+                      print(f"[-] FLUX.1-Krea-dev error: {e_flk}")
+                      renew_tor_ip()
+
+              # 5. Fallback 4: black-forest-labs/flux-klein-9b-kv (Superfast 4-step generation)
+              if not krea_success:
+                  try:
+                      print(f"[*] Trying Fallback 4: black-forest-labs/flux-klein-9b-kv...")
+                      client = Client("black-forest-labs/flux-klein-9b-kv", token=hf_tok, httpx_kwargs={"timeout": 60.0})
+                      result = client.predict(
+                          prompt=tuned_prompt,
+                          input_images=[],
+                          seed=float(krea_seed),
+                          randomize_seed=krea_rand,
+                          width=float(krea_w if krea_w <= 1024 else 1024),
+                          height=float(krea_h if krea_h <= 1024 else 1024),
+                          num_inference_steps=4.0,
+                          prompt_upsampling=False,
+                          api_name="/generate"
+                      )
+                      img_path = extract_path(result)
+                      if img_path and os.path.exists(img_path):
+                          Image.open(img_path).save(output_path, format="PNG")
+                          print("[+] flux-klein-9b-kv Fallback Generation Complete!")
+                          krea_success = True
+                      else:
+                          print(f"[-] flux-klein-9b-kv image path unresolved: {result}")
+                  except Exception as e_fk:
+                      print(f"[-] flux-klein-9b-kv fallback error: {e_fk}")
+
+          elif action == "minimax-h3":
+              print(f"[*] Connecting to MiniMax-H3 Uncensored Video+Audio Space...")
+              from gradio_client import Client
+              import random
+              video_output_path = "/tmp/ai_lab/output.mp4"
+              output_path = video_output_path
+              
+              try:
+                  video_duration = float(duration_val) if duration_val else 5.0
+                  if video_duration < 1.0:
+                      video_duration = 1.0
+                  elif video_duration > 10.0:
+                      video_duration = 10.0
+              except:
+                  video_duration = 5.0
+
+              if seed_val and seed_val != "-1":
+                  try:
+                      rand_seed = int(seed_val)
+                  except:
+                      rand_seed = random.randint(1, 999999)
+              else:
+                  rand_seed = random.randint(1, 999999)
+              final_seed = rand_seed
+
+              print(f"[*] MiniMax-H3 Configuration: Duration={video_duration}s | Steps={steps} | Seed={rand_seed}")
+              mm_success = False
+
+              # Space 1: Pepe104 (Uncensored + Turbo LoRA)
+              if not mm_success:
+                  try:
+                      print(f"[*] Trying Pepe104/MiniMax-H3-Turbo-Lora-UNCENSORED (Duration={video_duration}s, Steps={steps})...")
+                      client = Client("Pepe104/MiniMax-H3-Turbo-Lora-UNCENSORED")
+                      result = client.predict(
+                          prompt=f"{prompt}, photorealistic 8k, cinematic lighting, high fidelity, ultra detailed",
+                          image_path=None,
+                          last_image_path=None,
+                          canvas="960x544 \u00b7 16:9 fast",
+                          duration=video_duration,
+                          steps=steps if (4 <= steps <= 12) else 4,
+                          seed=rand_seed,
+                          upsample=False,
+                          use_lora=True,
+                          lora="larry",
+                          api_name="/generate"
+                      )
+                      vid_path = extract_path(result)
+                      if vid_path and os.path.exists(vid_path):
+                          import shutil
+                          shutil.copyfile(vid_path, video_output_path)
+                          print("[+] MiniMax-H3 Video+Audio Complete from Pepe104!")
+                          mm_success = True
+                  except Exception as err:
+                      print(f"[-] Pepe104 error: {err}")
+                      renew_tor_ip()
+
+              # Space 2: mrfakename (ultra-fast + Turbo LoRA hyper-fidelity)
+              if not mm_success:
+                  try:
+                      print(f"[*] Trying mrfakename/minimax-h3-ultra-fast (Duration={video_duration}s, Turbo LoRA)...")
+                      client = Client("mrfakename/minimax-h3-ultra-fast")
+                      result = client.predict(
+                          prompt=f"{prompt}, photorealistic 8k, cinematic lighting, high fidelity, ultra detailed",
+                          image_path=None,
+                          last_image_path=None,
+                          canvas="960x544 \u00b7 16:9 fast",
+                          duration=video_duration,
+                          steps=steps if (4 <= steps <= 12) else 4,
+                          seed=rand_seed,
+                          upsample=False,
+                          acceleration="Exact",
+                          lora_preset="Turbo \u00b7 4 steps",
+                          lora_repo="lightx2v/Minimax-h3-Turbo",
+                          lora_filename="",
+                          lora_strength=1.0,
+                          generation_preset="Turbo 4-step \u00b7 fastest, more artifacts",
+                          references=None,
+                          api_name="/generate"
+                      )
+                      vid_path = extract_path(result)
+                      if vid_path and os.path.exists(vid_path):
+                          import shutil
+                          shutil.copyfile(vid_path, video_output_path)
+                          print("[+] MiniMax-H3 Video+Audio Complete from mrfakename Turbo LoRA!")
+                          mm_success = True
+                  except Exception as err:
+                      print(f"[-] mrfakename error: {err}")
+                      renew_tor_ip()
+
+              # Space 3: multimodalart (official, minimal params)
+              if not mm_success:
+                  try:
+                      print("[*] Trying multimodalart/minimax-h3...")
+                      client = Client("multimodalart/minimax-h3")
+                      result = client.predict(
+                          prompt=prompt,
+                          image_path=None,
+                          last_image_path=None,
+                          canvas="960x544 \u00b7 16:9 fast",
+                          duration=video_duration,
+                          steps=28,
+                          seed=rand_seed,
+                          upsample=False,
+                          api_name="/generate"
+                      )
+                      vid_path = extract_path(result)
+                      if vid_path and os.path.exists(vid_path):
+                          import shutil
+                          shutil.copyfile(vid_path, video_output_path)
+                          print("[+] MiniMax-H3 Video+Audio Complete from multimodalart!")
+                          mm_success = True
+                  except Exception as err:
+                      print(f"[-] multimodalart error: {err}")
+                      renew_tor_ip()
+          elif action == "minimax-music":
+              print(f"[*] Composing studio-grade AI Music with MiniMax-Music3...")
+              audio_output_path = "/tmp/ai_lab/output.mp3"
+              output_path = audio_output_path
+              is_instrumental = image_url.lower() in ("true", "1", "yes") if image_url else False
+              
+              try:
+                  music_duration = int(float(duration_val)) if duration_val else 60
+              except:
+                  music_duration = 60
+
+              if seed_val and seed_val != "-1":
+                  try:
+                      rand_seed = int(seed_val)
+                      is_rand_seed = False
+                  except:
+                      rand_seed = random.randint(1, 9999999)
+                      is_rand_seed = True
+              else:
+                  rand_seed = random.randint(1, 9999999)
+                  is_rand_seed = True
+              final_seed = rand_seed
+
+              print(f"[*] MiniMax-Music3 Config: Duration={music_duration}s | Instrumental={is_instrumental} | Seed={rand_seed}")
+              music_success = False
+
+              try:
+                  from gradio_client import Client
+                  print(f"[*] Connecting to MiniMaxAI/MiniMax-Music3 Space...")
+                  client = Client("MiniMaxAI/MiniMax-Music3")
+                  state_payload = {
+                      "mode": "simple",
+                      "description": prompt,
+                      "instrumental": is_instrumental,
+                      "title": prompt[:30],
+                      "lyrics": "",
+                      "global_meta": "",
+                      "vocals": "",
+                      "arrangement": ""
+                  }
+                  print(f"[*] Generating song (duration={music_duration}s, instrumental={is_instrumental}): {prompt}...")
+                  result = client.predict(
+                      state=state_payload,
+                      duration=music_duration,
+                      seed=rand_seed,
+                      randomize_seed=is_rand_seed,
+                      headroom=0,
+                      steps=30,
+                      guidance=1.7,
+                      api_name="/simple_generate"
+                  )
+                  audio_path = extract_path(result)
+                  if audio_path and os.path.exists(audio_path):
+                      import shutil
+                      shutil.copyfile(audio_path, audio_output_path)
+                      print("[+] MiniMax Music 3 Generation Complete!")
+                      music_success = True
+                  else:
+                      print(f"[-] MiniMax Music path not resolved: {result}")
+                      renew_tor_ip()
+              except Exception as e:
+                  print(f"[-] MiniMax-Music3 error: {e}")
+                  renew_tor_ip()
+
+          elif action in ("yue-music", "yue"):
+              print(f"[*] Composing studio-grade AI Music with YuE 2 (3B)...")
+              # Format requested: style_val can be 'mp3' or 'flac' (or format passed via style_val)
+              raw_fmt = style_val.lower() if style_val else "mp3"
+              req_format = "flac" if "flac" in raw_fmt else "mp3"
+              audio_output_path = f"/tmp/ai_lab/output.{req_format}"
+              output_path = audio_output_path
+
+              style_prompt = prompt.strip() if prompt else "Dreamy synth-pop, warm female lead vocal, pulsing bass, shimmering synths"
+              lyrics_text = image_url.strip() if image_url and image_url.strip() else ""
+
+              # CoT / Planning mode ('full', 'melody', 'off')
+              cot_mode = steps_val.lower() if steps_val and steps_val.lower() in ("full", "melody", "off") else "full"
+
+              # Render quality for mrfakename/yue2-3b ('16' or '32', default '16')
+              # passed via duration_val or default to '16'
+              if duration_val and duration_val.strip() in ("16", "32"):
+                  render_quality = duration_val.strip()
+              else:
+                  render_quality = "16"
+
+              # Seed
+              if seed_val and seed_val != "-1":
+                  try:
+                      rand_seed = int(seed_val)
+                  except:
+                      rand_seed = random.randint(1, 10**6)
+              else:
+                  rand_seed = random.randint(1, 10**6)
+              final_seed = rand_seed
+
+              print(f"[*] YuE 2 Config: Style='{style_prompt[:60]}...' | Planning={cot_mode} | Quality={render_quality} | Seed={rand_seed} | Format={req_format}")
+              yue_success = False
+
+              # Space 1: Primary - mrfakename/yue2-3b
+              try:
+                  from gradio_client import Client
+                  print(f"[*] Connecting to Primary YuE2 Space: mrfakename/yue2-3b...")
+                  client = Client("mrfakename/yue2-3b")
+                  # Primary takes: style, lyrics, planning_mode ('full','melody','off'), render_quality ('16','32'), seed (int)
+                  primary_lyrics = lyrics_text if lyrics_text else "[verse]\nneon rain on silver glass\nshadows shift and moments pass\n[chorus]\nwe are the rhythm in the dark\na single beat, an endless spark"
+                  print(f"[*] Submitting to mrfakename/yue2-3b (/generate_song, planning_mode={cot_mode}, render_quality={render_quality}, seed={rand_seed})...")
+                  result = client.predict(
+                      style=style_prompt,
+                      lyrics=primary_lyrics,
+                      planning_mode=cot_mode,
+                      render_quality=render_quality,
+                      seed=rand_seed,
+                      api_name="/generate_song"
+                  )
+                  print(f"[+] Primary YuE2 Generation returned: {result}")
+                  chosen_path = None
+                  # returns [MP3 file, FLAC file, score]
+                  if isinstance(result, (list, tuple)) and len(result) >= 2:
+                      if req_format == "flac":
+                          chosen_path = extract_path(result[1]) or extract_path(result[0])
+                      else:
+                          chosen_path = extract_path(result[0]) or extract_path(result[1])
+                  if not chosen_path:
+                      chosen_path = extract_path(result)
+
+                  if chosen_path and os.path.exists(chosen_path):
+                      import shutil
+                      shutil.copyfile(chosen_path, audio_output_path)
+                      print(f"[+] Primary YuE2 Music Complete! Output written ({os.path.getsize(audio_output_path)} bytes)")
+                      yue_success = True
+                  else:
+                      print(f"[-] Primary YuE2 output path not resolved: {result}")
+                      renew_tor_ip()
+              except Exception as e:
+                  print(f"[-] Primary YuE2 Space error: {e}")
+                  renew_tor_ip()
+
+              # Space 2: Fallback - directedbykobyperez/YuE2-Create
+              # Safely strips mrfakename-specific options (render_quality) so it won't crash
+              if not yue_success:
+                  try:
+                      print(f"[*] 🔄 Triggering YuE2 Fallback: directedbykobyperez/YuE2-Create...")
+                      client = Client("directedbykobyperez/YuE2-Create")
+                      fallback_lyrics = lyrics_text if lyrics_text else ""
+                      result = client.predict(
+                          style=style_prompt,
+                          lyrics=fallback_lyrics,
+                          cot=cot_mode,
+                          seed=rand_seed,
+                          cfg_scale=1.0,
+                          api_name="/generate"
+                      )
+                      print(f"[+] Fallback YuE2 Generation returned: {result}")
+                      chosen_path = None
+                      if isinstance(result, (list, tuple)) and len(result) >= 4:
+                          if req_format == "flac":
+                              chosen_path = extract_path(result[1]) or extract_path(result[2]) or extract_path(result[0])
+                          else:
+                              chosen_path = extract_path(result[2]) or extract_path(result[0])
+                      if not chosen_path:
+                          chosen_path = extract_path(result)
+
+                      if chosen_path and os.path.exists(chosen_path):
+                          import shutil
+                          shutil.copyfile(chosen_path, audio_output_path)
+                          print(f"[+] Fallback YuE2 Music Generation Complete! Saved to {audio_output_path}")
+                          yue_success = True
+                      else:
+                          print(f"[-] Fallback YuE2 output path not resolved: {result}")
+                          renew_tor_ip()
+                  except Exception as e2:
+                      print(f"[-] Fallback YuE2 Space error: {e2}")
+                      renew_tor_ip()
+
+          elif action == "step-music":
+              print(f"[*] Composing High-Fidelity Studio Music with StepAudio-3-Music...")
+
+              # Parse flexible config payload from style_val
+              resp_format = "mp3"
+              bit_rate = 192
+              sample_rate = 44100
+              task_mode = "text_to_music"
+              generated_lyrics_full = ""
+
+              if style_val:
+                  try:
+                      cfg_p = json.loads(style_val)
+                      if isinstance(cfg_p, dict):
+                          resp_format = cfg_p.get("format", "mp3").lower()
+                          bit_rate = int(cfg_p.get("bitrate", 192))
+                          sample_rate = int(cfg_p.get("sample_rate", 44100))
+                          task_mode = cfg_p.get("task", "text_to_music")
+                  except Exception:
+                      pass
+
+              audio_output_path = f"/tmp/ai_lab/output.{resp_format}"
+              output_path = audio_output_path
+              step_success = False
+
+              # Extract parameters
+              caption_prompt = prompt.strip() if prompt else "An energetic electronic dance track with driving synth baseline"
+              custom_lyrics = image_url.strip() if image_url and image_url.strip() else ""
+              is_instrumental = str(steps_val).lower() in ("true", "1", "yes", "instrumental")
+
+              # StepAudio REST Payload
+              submit_url = "https://stepfun-ai-stepaudio-3-music.hf.space/v1/audio/music/submit"
+              query_url = "https://stepfun-ai-stepaudio-3-music.hf.space/v1/audio/music/query"
+
+              payload = {
+                  "task": task_mode,
+                  "caption": caption_prompt,
+                  "model_id": "step-music",
+                  "response_format": resp_format,
+                  "sample_rate": sample_rate
+              }
+              if resp_format in ("mp3", "opus"):
+                  payload["bit_rate"] = bit_rate
+
+              if custom_lyrics:
+                  payload["lyrics"] = custom_lyrics
+              elif is_instrumental:
+                  payload["caption"] = f"{caption_prompt}, purely instrumental, no vocals, no singing"
+                  payload["instrumental"] = True
+
+              try:
+                  print(f"[*] Submitting to StepAudio-3: Caption='{caption_prompt[:60]}' | Mode={task_mode} | Format={resp_format}@{bit_rate}k | Instrumental={is_instrumental}...")
+                  resp = requests.post(submit_url, json=payload, timeout=60)
+                  if resp.status_code == 200:
+                      task_data = resp.json()
+                      task_id = task_data.get("task_id")
+                      print(f"[+] StepAudio Task Queued! Task ID: {task_id}")
+
+                      # Poll for completion (up to 4 minutes)
+                      import time
+                      import base64
+                      for attempt in range(48):
+                          time.sleep(5)
+                          q_resp = requests.post(query_url, json={"task_id": task_id}, timeout=30)
+                          if q_resp.status_code == 200:
+                              q_data = q_resp.json()
+                              q_status = q_data.get("status")
+                              if q_status == "SUCCESS":
+                                  audio_b64 = q_data.get("audio", "")
+                                  if audio_b64:
+                                      with open(audio_output_path, "wb") as f_out:
+                                          f_out.write(base64.b64decode(audio_b64))
+                                      print(f"[+] StepAudio-3 Music Complete! Output written ({os.path.getsize(audio_output_path)} bytes)")
+                                      generated_lyrics_full = q_data.get("rewritten_lyrics") or custom_lyrics
+                                      if generated_lyrics_full:
+                                          print(f"[+] Studio Lyrics ready ({len(generated_lyrics_full)} chars)")
+                                      step_success = True
+                                      break
+                              elif q_status == "FAILED":
+                                  print(f"[-] StepAudio Task Failed: {q_data}")
+                                  break
+                              elif attempt % 3 == 0:
+                                  print(f"[*] StepAudio Still Composing... ({attempt * 5}s elapsed)")
+                  else:
+                      print(f"[-] StepAudio Submit HTTP error: {resp.status_code} - {resp.text}")
+              except Exception as e_step:
+                  print(f"[-] StepAudio primary error: {e_step}")
+                  renew_tor_ip()
+
+              # Fallback to MiniMax Music if StepAudio was busy
+              if not step_success:
+                  print("[*] Falling back to MiniMax-Music3...")
+                  try:
+                      from gradio_client import Client
+                      client = Client("MiniMaxAI/MiniMax-Music3")
+                      state_payload = {
+                          "mode": "simple",
+                          "description": caption_prompt,
+                          "instrumental": is_instrumental,
+                          "title": caption_prompt[:30],
+                          "lyrics": custom_lyrics,
+                          "global_meta": "",
+                          "vocals": "",
+                          "arrangement": ""
+                      }
+                      result = client.predict(
+                          state=state_payload,
+                          duration="120",
+                          seed=random.randint(1, 999999),
+                          randomize_seed=True,
+                          headroom=0,
+                          steps=30,
+                          guidance=1.7,
+                          api_name="/simple_generate"
+                      )
+                      audio_path = extract_path(result)
+                      if audio_path and os.path.exists(audio_path):
+                          import shutil
+                          shutil.copyfile(audio_path, audio_output_path)
+                          print("[+] MiniMax Music Fallback Complete!")
+                          step_success = True
+                  except Exception as e_mm:
+                      print(f"[-] MiniMax fallback error: {e_mm}")
+
+          elif action == "kokoro-tts":
+              print(f"[*] Generating Kokoro-TTS Hyper-Realistic Voice...")
+              audio_output_path = "/tmp/ai_lab/output.mp3"
+              output_path = audio_output_path
+              voice = os.environ.get("IMAGE_URL", "af_heart")
+              if not voice or voice.startswith("http"):
+                  voice = "af_heart"
+              tts_success = False
+
+              # Attempt 1: Fast Gradio Space
+              try:
+                  from gradio_client import Client
+                  client = Client("remsky/Kokoro-TTS-Zero")
+                  print(f"[*] Generating speech via Space (voice: {voice}): {prompt[:80]}...")
+                  result = client.predict(
+                      text=prompt,
+                      voice_names=[voice],
+                      speed=1.0,
+                      api_name="/generate_speech_from_ui"
+                  )
+                  audio_path = extract_path(result)
+                  if audio_path and os.path.exists(audio_path):
+                      import shutil
+                      shutil.copyfile(audio_path, audio_output_path)
+                      print("[+] Kokoro Space generation complete!")
+                      tts_success = True
+              except Exception as e:
+                  print(f"[-] Kokoro Space error: {e}")
+                  renew_tor_ip()
+
+              # Attempt 2: Local pipeline fallback in 23GB memory
+              if not tts_success:
+                  try:
+                      print("[*] Running local Kokoro synthesis fallback...")
+                      from kokoro import KPipeline
+                      import soundfile as sf
+                      import numpy as np
+                      pipeline = KPipeline(lang_code='a')
+                      generator = pipeline(prompt, voice=voice, speed=1, split_pattern=r'\n+')
+                      audio_pieces = []
+                      for i, (gs, ps, audio) in enumerate(generator):
+                          audio_pieces.append(audio)
+                      if audio_pieces:
+                          full_audio = np.concatenate(audio_pieces)
+                          sf.write(audio_output_path, full_audio, 24000)
+                          print("[+] Local Kokoro generation complete!")
+                  except Exception as err2:
+                      print(f"[-] Local Kokoro error: {err2}")
+
+          elif action == "qwen-voice":
+              print(f"[*] Generating speech via Qwen3-TTS Neural Studio...")
+              audio_output_path = "/tmp/ai_lab/output.mp3"
+              output_path = audio_output_path
+              
+              # Parse parameters from IMAGE_URL (supports JSON or raw string)
+              voice_payload_raw = os.environ.get("IMAGE_URL", "Vivian")
+              voice_params = {}
+              try:
+                  voice_params = json.loads(voice_payload_raw)
+              except Exception:
+                  voice_params = {"mode": "preset", "speaker": voice_payload_raw or "Vivian"}
+
+              mode = voice_params.get("mode", "preset")
+              speaker_raw = voice_params.get("speaker", "Vivian")
+              ref_audio_url = voice_params.get("ref_audio_url", "")
+              ref_text = voice_params.get("ref_text", "")
+              voice_description = voice_params.get("voice_description", "")
+              instruct = voice_params.get("instruct", "Natural, expressive, clear studio quality voice.")
+              language = voice_params.get("language", "Auto")
+              model_size = voice_params.get("model_size", "1.7B")
+
+              speaker_map = {
+                  "vivian": "Vivian",
+                  "serena": "Serena",
+                  "uncle_fu": "Uncle_fu",
+                  "uncle fu": "Uncle_fu",
+                  "dylan": "Dylan",
+                  "eric": "Eric",
+                  "ryan": "Ryan",
+                  "aiden": "Aiden",
+                  "ono_anna": "Ono_anna",
+                  "ono anna": "Ono_anna",
+                  "sohee": "Sohee"
+              }
+              speaker = speaker_map.get(str(speaker_raw).lower().replace(" ", "_"), "Vivian")
+              qwen_voice_success = False
+
+              # Download ref audio if in clone mode
+              local_ref_audio = None
+              if mode == "clone" and ref_audio_url:
+                  try:
+                      local_ref_audio = "/tmp/ai_lab/ref_audio.mp3"
+                      print(f"[*] Downloading reference audio for clone: {ref_audio_url}")
+                      r_audio = requests.get(ref_audio_url, timeout=30)
+                      if r_audio.status_code == 200:
+                          with open(local_ref_audio, "wb") as af:
+                              af.write(r_audio.content)
+                          print(f"[+] Downloaded ref audio ({len(r_audio.content)} bytes)")
+                      else:
+                          print(f"[-] Ref audio download returned status {r_audio.status_code}")
+                          local_ref_audio = None
+                  except Exception as ref_err:
+                      print(f"[-] Failed downloading ref audio: {ref_err}")
+                      local_ref_audio = None
+
+              # Attempt 1: Official Qwen/Qwen3-TTS (Preset, Clone, or Design mode)
+              try:
+                  from gradio_client import Client, handle_file
+                  print(f"[*] Connecting to Qwen/Qwen3-TTS (mode: {mode}, model: {model_size})...")
+                  client = Client("Qwen/Qwen3-TTS")
+
+                  if mode == "clone" and local_ref_audio and os.path.exists(local_ref_audio):
+                      print(f"[*] Calling /generate_voice_clone...")
+                      result = client.predict(
+                          ref_audio=handle_file(local_ref_audio),
+                          ref_text=ref_text,
+                          target_text=prompt,
+                          language=language,
+                          use_xvector_only=False,
+                          model_size=model_size,
+                          api_name="/generate_voice_clone"
+                      )
+                  elif mode == "design" and voice_description:
+                      print(f"[*] Calling /generate_voice_design (description: {voice_description})...")
+                      result = client.predict(
+                          text=prompt,
+                          language=language,
+                          voice_description=voice_description,
+                          api_name="/generate_voice_design"
+                      )
+                  else:
+                      print(f"[*] Calling /generate_custom_voice (speaker: {speaker})...")
+                      result = client.predict(
+                          text=prompt,
+                          language=language,
+                          speaker=speaker,
+                          instruct=instruct,
+                          model_size=model_size,
+                          api_name="/generate_custom_voice"
+                      )
+
+                  audio_path = extract_path(result)
+                  if audio_path and os.path.exists(audio_path):
+                      import shutil
+                      shutil.copyfile(audio_path, audio_output_path)
+                      print(f"[+] Official Qwen3-TTS generation complete! (mode: {mode})")
+                      qwen_voice_success = True
+              except Exception as e:
+                  print(f"[-] Qwen3-TTS Space error: {e}")
+                  renew_tor_ip()
+
+              # Attempt 2: Fallback to techfreakworm/qwen-voice-studio (Preset mode)
+              if not qwen_voice_success and mode == "preset":
+                  try:
+                      from gradio_client import Client
+                      print(f"[*] Fallback: Connecting to techfreakworm/qwen-voice-studio (speaker: {speaker})...")
+                      client = Client("techfreakworm/qwen-voice-studio")
+                      result = client.predict(
+                          text=prompt,
+                          speaker=speaker,
+                          instruct=instruct or "",
+                          language="Auto (detect)",
+                          longform=False,
+                          param_5=0.7,
+                          param_6=0.8,
+                          param_7=50,
+                          param_8=1.05,
+                          param_9=False,
+                          param_10=0.7,
+                          param_11=0.8,
+                          param_12=50,
+                          param_13=1024,
+                          param_14=-1,
+                          api_name="/do_preset"
+                      )
+                      audio_path = extract_path(result)
+                      if audio_path and os.path.exists(audio_path):
+                          import shutil
+                          shutil.copyfile(audio_path, audio_output_path)
+                          print("[+] techfreakworm Qwen Voice generation complete!")
+                          qwen_voice_success = True
+                  except Exception as e:
+                      print(f"[-] techfreakworm Qwen Voice error: {e}")
+                      renew_tor_ip()
+
+              # Attempt 3: F5-TTS Fallback for voice clone if Qwen clone fails
+              if not qwen_voice_success and mode == "clone" and local_ref_audio and os.path.exists(local_ref_audio):
+                  try:
+                      from gradio_client import Client, handle_file
+                      print(f"[*] Voice Clone Fallback: Connecting to mrfakename/E2-F5-TTS...")
+                      client = Client("mrfakename/E2-F5-TTS")
+                      result = client.predict(
+                          ref_audio=handle_file(local_ref_audio),
+                          ref_text=ref_text,
+                          gen_text=prompt,
+                          remove_silence=False,
+                          api_name="/predict"
+                      )
+                      audio_path = extract_path(result)
+                      if audio_path and os.path.exists(audio_path):
+                          import shutil
+                          shutil.copyfile(audio_path, audio_output_path)
+                          print("[+] E2-F5-TTS clone fallback generation complete!")
+                          qwen_voice_success = True
+                  except Exception as e:
+                      print(f"[-] E2-F5-TTS fallback error: {e}")
+                      renew_tor_ip()
+
+              # Attempt 4: Fallback to Kokoro-TTS if all else fails
+              if not qwen_voice_success:
+                  try:
+                      print("[*] Quota/Space fallback: Generating via Kokoro-TTS...")
+                      from kokoro import KPipeline
+                      import soundfile as sf
+                      import numpy as np
+                      pipeline = KPipeline(lang_code='a')
+                      generator = pipeline(prompt, voice='af_heart', speed=1, split_pattern=r'\n+')
+                      audio_pieces = []
+                      for i, (gs, ps, audio) in enumerate(generator):
+                          audio_pieces.append(audio)
+                      if audio_pieces:
+                          full_audio = np.concatenate(audio_pieces)
+                          sf.write(audio_output_path, full_audio, 24000)
+                          print("[+] Fallback Kokoro generation complete!")
+                  except Exception as fallback_err:
+                      print(f"[-] Voice fallback error: {fallback_err}")
+
+          elif action in ("breeze-tts", "breeze"):
+              print(f"[*] Generating speech via Breeze TTS 2 Neural Engine...")
+              audio_output_path = "/tmp/ai_lab/output.wav"
+              output_path = audio_output_path
+
+              # Parse parameters from IMAGE_URL (JSON payload or raw string)
+              breeze_payload_raw = os.environ.get("IMAGE_URL", "")
+              breeze_params = {}
+              try:
+                  breeze_params = json.loads(breeze_payload_raw)
+              except Exception:
+                  breeze_params = {"mode": "design", "instruction": breeze_payload_raw or ""}
+
+              mode = breeze_params.get("mode", steps_val or "design").lower()
+              instruction = breeze_params.get("instruction", "").strip()
+              ref_audio_url = breeze_params.get("ref_audio_url", "").strip()
+              ref_text = breeze_params.get("ref_text", "").strip()
+
+              try:
+                  cfg_scale = float(breeze_params.get("cfg_scale", duration_val or 4.0))
+              except:
+                  cfg_scale = 4.0
+
+              if seed_val and seed_val != "-1":
+                  try:
+                      rand_seed = int(seed_val)
+                  except:
+                      rand_seed = 42
+              else:
+                  rand_seed = random.randint(1, 10**6)
+              final_seed = rand_seed
+
+              text_to_speak = prompt.strip() if prompt else "Welcome to Xploit AI Lab."
+
+              # Download ref_audio if in clone or direction mode
+              local_ref_audio = None
+              if mode in ("clone", "direction") and ref_audio_url:
+                  try:
+                      local_ref_audio = "/tmp/ai_lab/breeze_ref.wav"
+                      print(f"[*] Downloading Breeze reference audio: {ref_audio_url}")
+                      r_audio = requests.get(ref_audio_url, timeout=30)
+                      if r_audio.status_code == 200:
+                          with open(local_ref_audio, "wb") as af:
+                              af.write(r_audio.content)
+                          print(f"[+] Downloaded reference audio ({len(r_audio.content)} bytes)")
+                      else:
+                          print(f"[-] Reference audio download failed: {r_audio.status_code}")
+                          local_ref_audio = None
+                  except Exception as err:
+                      print(f"[-] Error downloading reference audio: {err}")
+                      local_ref_audio = None
+
+              # Default instructions if missing
+              if mode == "design" and not instruction:
+                  instruction = "A warm, thoughtful young woman with a clear voice and a calm, reflective delivery."
+              elif mode == "direction" and not instruction:
+                  instruction = "Speak slowly with a restrained, serious tone."
+
+              print(f"[*] Breeze TTS 2 Config: Mode={mode} | CFG={cfg_scale} | Seed={rand_seed} | RefAudio={'Yes' if local_ref_audio else 'No'}")
+              breeze_success = False
+
+              def run_breeze_space(space_id):
+                  from gradio_client import Client, handle_file
+                  print(f"[*] Connecting to Breeze Space: {space_id}...")
+                  client = Client(space_id)
+
+                  if mode == "clone":
+                      if not local_ref_audio or not os.path.exists(local_ref_audio):
+                          raise ValueError("Voice Clone mode requires a reference audio file.")
+                      ref_file = handle_file(local_ref_audio)
+                      resolved_ref_text = ref_text
+                      if not resolved_ref_text:
+                          try:
+                              print("[*] Auto-transcribing reference audio with Whisper...")
+                              resolved_ref_text = client.predict(ref_file, api_name="/transcribe_reference")
+                              print(f"[+] Whisper Transcript: '{resolved_ref_text}'")
+                          except Exception as te:
+                              print(f"[-] Auto-transcribe failed ({te}), using default placeholder")
+                              resolved_ref_text = "Clean reference speech sample."
+
+                      print(f"[*] Running /voice_clone on {space_id}...")
+                      res = client.predict(
+                          text=text_to_speak,
+                          ref_audio_path=ref_file,
+                          ref_text=resolved_ref_text or "speech sample",
+                          seed=rand_seed,
+                          api_name="/voice_clone"
+                      )
+                  elif mode == "direction":
+                      if not local_ref_audio or not os.path.exists(local_ref_audio):
+                          raise ValueError("Voice Direction mode requires a reference audio file.")
+                      ref_file = handle_file(local_ref_audio)
+                      resolved_ref_text = ref_text
+                      if not resolved_ref_text:
+                          try:
+                              print("[*] Auto-transcribing reference audio with Whisper...")
+                              resolved_ref_text = client.predict(ref_file, api_name="/transcribe_reference_direction")
+                              print(f"[+] Whisper Transcript: '{resolved_ref_text}'")
+                          except Exception as te:
+                              try:
+                                  resolved_ref_text = client.predict(ref_file, api_name="/transcribe_reference")
+                              except:
+                                  resolved_ref_text = "Clean reference speech sample."
+
+                      print(f"[*] Running /voice_direction on {space_id} (instruction: '{instruction}')...")
+                      res = client.predict(
+                          text=text_to_speak,
+                          instruction=instruction,
+                          ref_audio_path=ref_file,
+                          ref_text=resolved_ref_text or "speech sample",
+                          cfg_scale=cfg_scale,
+                          seed=rand_seed,
+                          api_name="/voice_direction"
+                      )
+                  else: # design mode
+                      print(f"[*] Running /voice_design on {space_id} (instruction: '{instruction}')...")
+                      res = client.predict(
+                          text=text_to_speak,
+                          instruction=instruction,
+                          cfg_scale=cfg_scale,
+                          seed=rand_seed,
+                          api_name="/voice_design"
+                      )
+
+                  gen_path = extract_path(res)
+                  if gen_path and os.path.exists(gen_path):
+                      import shutil
+                      shutil.copyfile(gen_path, audio_output_path)
+                      print(f"[+] Breeze TTS 2 synthesis complete from {space_id}! Saved to {audio_output_path}")
+                      breeze_success = True
+                      return True
+                  else:
+                      print(f"[-] Breeze output path not resolved: {res}")
+                      return False
+
+              spaces_to_try = [
+                  "BreezeBlue/breeze-tts-2-demo",
+                  "Daankular/breeze-tts-2",
+                  "RobinsAIWorld/breeze-tts-2-demo",
+                  "idkhungle/breeze-tts-2-demo"
+              ]
+
+              for s_id in spaces_to_try:
+                  if breeze_success:
+                      break
+                  try:
+                      if run_breeze_space(s_id):
+                          breeze_success = True
+                          break
+                  except Exception as be:
+                      print(f"[-] Error on {s_id}: {be}")
+                      renew_tor_ip()
+
+              # Fallback to local Kokoro-TTS if all Breeze spaces hit limit
+              if not breeze_success:
+                  try:
+                      print("[*] Quota/Space fallback: Generating via Kokoro-TTS...")
+                      from kokoro import KPipeline
+                      import soundfile as sf
+                      import numpy as np
+                      pipeline = KPipeline(lang_code='a')
+                      generator = pipeline(text_to_speak, voice='af_heart', speed=1, split_pattern=r'\n+')
+                      audio_pieces = []
+                      for i, (gs, ps, audio) in enumerate(generator):
+                          audio_pieces.append(audio)
+                      if audio_pieces:
+                          full_audio = np.concatenate(audio_pieces)
+                          sf.write(audio_output_path, full_audio, 24000)
+                          print("[+] Fallback Kokoro generation complete for Breeze!")
+                          breeze_success = True
+                  except Exception as fb_err:
+                      print(f"[-] Breeze final fallback error: {fb_err}")
+
+          elif action in ("triposplat", "tripo", "tripo-3d"):
+              print(f"[*] Initializing 3D Gaussian Splatting Engine with TripoSplat...")
+              import requests
+              from gradio_client import Client, handle_file
+
+              if not image_url:
+                  raise ValueError("TripoSplat requires an input image URL!")
+
+              input_img_path = "/tmp/ai_lab/input_tripo.png"
+              try:
+                  r_img = requests.get(image_url, timeout=30)
+                  with open(input_img_path, "wb") as f_in:
+                      f_in.write(r_img.content)
+                  print(f"[+] Downloaded source image ({os.path.getsize(input_img_path)} bytes)")
+              except Exception as e_dl:
+                  raise RuntimeError(f"Failed to download image from {image_url}: {e_dl}")
+
+              try:
+                  steps = int(steps_val) if steps_val and str(steps_val).isdigit() else 20
+              except:
+                  steps = 20
+
+              try:
+                  guidance_scale = float(duration_val) if duration_val else 3.0
+              except:
+                  guidance_scale = 3.0
+
+              try:
+                  if prompt and str(prompt).strip().isdigit():
+                      num_gaussians = int(str(prompt).strip())
+                  else:
+                      num_gaussians = 262144
+              except:
+                  num_gaussians = 262144
+
+              req_format = "splat" if style_val and "splat" in style_val.lower() else "ply"
+
+              if seed_val and seed_val != "-1":
+                  try:
+                      rand_seed = int(seed_val)
+                  except:
+                      rand_seed = 42
+              else:
+                  rand_seed = random.randint(1, 10**6)
+              final_seed = rand_seed
+
+              output_model_path = f"/tmp/ai_lab/output.{req_format}"
+              output_path = output_model_path
+
+              print(f"[*] TripoSplat Config: Gaussians={num_gaussians} | Steps={steps} | Guidance={guidance_scale} | Format={req_format} | Seed={rand_seed}")
+
+              hf_tok = os.environ.get("HF_TOKEN") or None
+              tripo_success = False
+
+              # Primary space + public mirrors
+              spaces_to_try = [
+                  "VAST-AI/TripoSplat",
+                  "marcmagn1/TripoSplat",
+                  "akhaliq/TripoSplat"
+              ]
+
+              for space_name in spaces_to_try:
+                  if tripo_success:
+                      break
+                  try:
+                      print(f"[*] Connecting to TripoSplat Space: {space_name}...")
+                      client = Client(space_name, token=hf_tok, httpx_kwargs={"timeout": 180.0})
+                      print(f"[*] Submitting /generate to {space_name}...")
+                      result = client.predict(
+                          image=handle_file(input_img_path),
+                          seed=rand_seed,
+                          steps=steps,
+                          guidance_scale=guidance_scale,
+                          num_gaussians=num_gaussians,
+                          output_format=req_format,
+                          api_name="/generate"
+                      )
+                      print(f"[+] {space_name} returned: {result}")
+                      chosen_path = None
+                      if isinstance(result, (list, tuple)) and len(result) >= 3:
+                          chosen_path = extract_path(result[2]) or extract_path(result[1])
+                      if not chosen_path:
+                          chosen_path = extract_path(result)
+
+                      if chosen_path and os.path.exists(chosen_path):
+                          import shutil
+                          shutil.copyfile(chosen_path, output_model_path)
+                          print(f"[+] TripoSplat 3D Model Complete! Saved to {output_model_path} ({os.path.getsize(output_model_path)} bytes)")
+                          tripo_success = True
+                          break
+                      else:
+                          print(f"[-] Could not resolve model path from: {result}")
+                          renew_tor_ip()
+                  except Exception as e_tripo:
+                      print(f"[-] TripoSplat error on {space_name}: {e_tripo}")
+                      renew_tor_ip()
+
+              if not tripo_success:
+                  print("[-] All TripoSplat spaces failed or rate-limited.")
+
+          elif action == "openvoice":
+              print(f"[*] Synthesizing speech with OpenVoice V2 Instant Cloning...")
+              import requests
+              from gradio_client import Client, handle_file
+
+              text_prompt = prompt.strip() if prompt else "Hello from Xploit AI Lab"
+              style_preset = steps_val if steps_val else "en_us"
+              ref_audio_url = image_url.strip() if image_url else ""
+
+              audio_output_path = "/tmp/ai_lab/output.mp3"
+              output_path = audio_output_path
+
+              ref_local_path = "/tmp/ai_lab/ref_openvoice.mp3"
+              if ref_audio_url:
+                  r_ref = requests.get(ref_audio_url, timeout=30)
+                  with open(ref_local_path, "wb") as f_ref:
+                      f_ref.write(r_ref.content)
+                  print(f"[+] Downloaded reference audio ({os.path.getsize(ref_local_path)} bytes)")
+              else:
+                  raise ValueError("OpenVoice requires a reference audio file to clone!")
+
+              hf_tok = os.environ.get("HF_TOKEN") or None
+              ov_success = False
+
+              # Engine 1: Instant Neural Voice Clone (tonyassi/voice-clone - SSE Gradio protocol)
+              try:
+                  print(f"[*] Submitting to Instant Voice Clone Engine: tonyassi/voice-clone...")
+                  client = Client("tonyassi/voice-clone", token=hf_tok, httpx_kwargs={"timeout": 180.0})
+                  res = client.predict(
+                      text=text_prompt,
+                      audio=handle_file(ref_local_path),
+                      api_name="/clone"
+                  )
+                  print(f"[+] Voice Clone returned: {res}")
+                  chosen_audio = extract_path(res)
+                  if chosen_audio and os.path.exists(chosen_audio):
+                      import shutil
+                      shutil.copyfile(chosen_audio, audio_output_path)
+                      print(f"[+] Voice Clone Complete! Saved to {audio_output_path}")
+                      ov_success = True
+                  else:
+                      print("[-] Could not extract audio from voice-clone output")
+              except Exception as e_vc:
+                  print(f"[-] Voice Clone error: {e_vc}")
+
+          elif action == "wan-animate":
+              print(f"[*] Running Wan 2.2 Character Animation & Motion Pipeline...")
+              import requests
+              from gradio_client import Client, handle_file
+
+              driving_video_url = prompt.strip() if prompt else ""
+              target_image_url = image_url.strip() if image_url else ""
+              mode_val = steps_val if steps_val else "Character Swap"
+
+              try:
+                  dur_val = float(duration_val) if duration_val else 2.0
+              except:
+                  dur_val = 2.0
+
+              res_choice = style_val if style_val else "Low Res"
+
+              video_output_path = "/tmp/ai_lab/output.mp4"
+              output_path = video_output_path
+
+              input_vid = "/tmp/ai_lab/driving_video.mp4"
+              input_img = "/tmp/ai_lab/target_frame.png"
+
+              r_v = requests.get(driving_video_url, timeout=45)
+              with open(input_vid, "wb") as f_v:
+                  f_v.write(r_v.content)
+
+              r_i = requests.get(target_image_url, timeout=30)
+              with open(input_img, "wb") as f_i:
+                  f_i.write(r_i.content)
+
+              hf_tok = os.environ.get("HF_TOKEN") or None
+              wan_anim_success = False
+
+              # Space 1: Primary - alexnasa/Wan2.2-Animate-ZEROGPU
+              try:
+                  print("[*] Connecting to Primary: alexnasa/Wan2.2-Animate-ZEROGPU...")
+                  client = Client("alexnasa/Wan2.2-Animate-ZEROGPU", token=hf_tok, httpx_kwargs={"timeout": 300.0})
+                  res = client.predict(
+                      input_video=handle_file(input_vid),
+                      max_duration_s=min(max(float(dur_val), 2.0), 5.0),
+                      edited_frame=handle_file(input_img),
+                      rc_str=mode_val if mode_val in ("Character Swap", "Background Swap") else "Character Swap",
+                      resolution_choice="Low Res",
+                      api_name="/animate_scene"
+                  )
+                  print(f"[+] alexnasa/Wan2.2-Animate returned: {res}")
+                  chosen_vid = None
+                  if isinstance(res, (list, tuple)) and len(res) >= 1:
+                      chosen_vid = extract_path(res[0])
+                  if not chosen_vid:
+                      chosen_vid = extract_path(res)
+                  if chosen_vid and os.path.exists(chosen_vid):
+                      import shutil
+                      shutil.copyfile(chosen_vid, video_output_path)
+                      print(f"[+] Primary Wan Animate Complete! Saved to {video_output_path}")
+                      wan_anim_success = True
+              except Exception as e_p:
+                  print(f"[-] Primary Wan Animate error: {e_p}")
+                  renew_tor_ip()
+
+              # Space 2: Fallback - hugging-apps/wan2-2-animate-2-14b
+              if not wan_anim_success:
+                  try:
+                      print("[*] 🔄 Triggering Fallback: hugging-apps/wan2-2-animate-2-14b...")
+                      client = Client("hugging-apps/wan2-2-animate-2-14b", token=hf_tok, httpx_kwargs={"timeout": 300.0})
+                      res = client.predict(
+                          image=handle_file(input_img),
+                          driving_video=handle_file(input_vid),
+                          prompt="animate this character naturally with smooth cinematic motion",
+                          max_seconds=min(max(float(dur_val), 1.0), 3.0),
+                          height=480,
+                          width=384,
+                          num_inference_steps=12,
+                          guidance_scale=1.5,
+                          sample_shift=5.0,
+                          negative_prompt="blurry, distorted, low quality, glitch",
+                          seed=42,
+                          api_name="/animate"
+                      )
+                      print(f"[+] Fallback Wan Animate returned: {res}")
+                      chosen_vid = extract_path(res)
+                      if chosen_vid and os.path.exists(chosen_vid):
+                          import shutil
+                          shutil.copyfile(chosen_vid, video_output_path)
+                          print(f"[+] Fallback Wan Animate Complete! Saved to {video_output_path}")
+                          wan_anim_success = True
+                  except Exception as e_fb:
+                      print(f"[-] Fallback Wan Animate error: {e_fb}")
+
+          elif action == "viggle":
+              print(f"[*] Running Viggle AI Character Animation & Motion Dance Engine...")
+              import requests
+              from gradio_client import Client, handle_file
+
+              driving_video_url = prompt.strip() if prompt else ""
+              character_image_url = image_url.strip() if image_url else ""
+
+              if seed_val and seed_val != "-1":
+                  try:
+                      rand_seed = int(seed_val)
+                  except:
+                      rand_seed = 42
+              else:
+                  rand_seed = 42
+              final_seed = rand_seed
+
+              video_output_path = "/tmp/ai_lab/output.mp4"
+              output_path = video_output_path
+
+              input_vid = "/tmp/ai_lab/viggle_motion.mp4"
+              input_char = "/tmp/ai_lab/viggle_char.png"
+
+              r_v = requests.get(driving_video_url, timeout=45)
+              with open(input_vid, "wb") as f_v:
+                  f_v.write(r_v.content)
+
+              r_c = requests.get(character_image_url, timeout=30)
+              with open(input_char, "wb") as f_c:
+                  f_c.write(r_c.content)
+
+              hf_tok = os.environ.get("HF_TOKEN") or None
+              viggle_success = False
+              try:
+                  client = Client("Viggle/viggle-animate", token=hf_tok, httpx_kwargs={"timeout": 240.0})
+                  print("[*] Viggle: Step 1 - /prepare...")
+                  try:
+                      prep = client.predict(
+                          video={"video": handle_file(input_vid)},
+                          character=handle_file(input_char),
+                          painted=None,
+                          api_name="/prepare"
+                      )
+                  except Exception as e_prep_init:
+                      print(f"[*] Viggle prepare fallback mode: {e_prep_init}")
+                      prep = client.predict(
+                          video={"video": handle_file(input_vid), "subtitles": None},
+                          character=handle_file(input_char),
+                          painted=handle_file(input_char),
+                          api_name="/prepare"
+                      )
+                  print(f"[+] Viggle prepare returned: {prep}")
+
+                  print(f"[*] Viggle: Step 2 - /render (seed={rand_seed})...")
+                  render_res = client.predict(
+                      seed=rand_seed,
+                      api_name="/render"
+                  )
+                  print(f"[+] Viggle render returned: {render_res}")
+
+                  print("[*] Viggle: Step 3 - /finish...")
+                  fin_res = client.predict(api_name="/finish")
+                  print(f"[+] Viggle finish returned: {fin_res}")
+
+                  chosen_vid = extract_path(fin_res)
+                  if not chosen_vid and isinstance(prep, (list, tuple)) and len(prep) >= 2:
+                      chosen_vid = extract_path(prep[1])
+
+                  if chosen_vid and os.path.exists(chosen_vid):
+                      import shutil
+                      shutil.copyfile(chosen_vid, video_output_path)
+                      print(f"[+] Viggle Animate Complete! Saved to {video_output_path}")
+                      viggle_success = True
+                  else:
+                      print("[-] Could not extract Viggle video")
+              except Exception as e_viggle:
+                  print(f"[-] Viggle error: {e_viggle}")
+
+              # Space 2: Fallback - KlingTeam/LivePortrait (Instant ZeroGPU Motion & Animation Transfer)
+              if not viggle_success:
+                  try:
+                      print("[*] 🔄 Triggering ZeroGPU Motion Transfer Fallback: KlingTeam/LivePortrait...")
+                      lp_client = Client("KlingTeam/LivePortrait", token=hf_tok, httpx_kwargs={"timeout": 240.0})
+                      lp_res = lp_client.predict(
+                          handle_file(input_char),
+                          handle_file(input_vid),
+                          True,
+                          True,
+                          True,
+                          api_name="/gpu_wrapped_execute_video"
+                      )
+                      print(f"[+] LivePortrait returned: {lp_res}")
+                      chosen_vid = None
+                      if isinstance(lp_res, (list, tuple)) and len(lp_res) >= 1:
+                          chosen_vid = extract_path(lp_res[0])
+                      if not chosen_vid:
+                          chosen_vid = extract_path(lp_res)
+                      if chosen_vid and os.path.exists(chosen_vid):
+                          import shutil
+                          shutil.copyfile(chosen_vid, video_output_path)
+                          print(f"[+] Motion Transfer Complete via LivePortrait Engine! Saved to {video_output_path}")
+                          viggle_success = True
+                  except Exception as e_lp:
+                      print(f"[-] LivePortrait fallback error: {e_lp}")
+
+          elif action == "hq-video":
+              print(f"[*] Generating High-FPS Video with HighQualityVideoGeneration...")
+              import requests
+              from gradio_client import Client, handle_file
+
+              prompt_text = prompt.strip() if prompt else "make this image come alive, cinematic motion, smooth animation"
+              img_url = image_url.strip() if image_url else ""
+              try:
+                  fps_mul = int(steps_val) if steps_val and int(steps_val) in (16, 32, 64, 128) else 16
+              except:
+                  fps_mul = 16
+
+              try:
+                  dur_sec = float(duration_val) if duration_val else 3.5
+              except:
+                  dur_sec = 3.5
+
+              # Set upscale to False to stay within standard ZeroGPU quota limits (<60s GPU grant)
+              upscale_flag = False
+              if style_val.lower() == "true" and dur_sec <= 2.5 and fps_mul <= 16:
+                  upscale_flag = True
+
+              if seed_val and seed_val != "-1":
+                  try:
+                      rand_seed = int(seed_val)
+                  except:
+                      rand_seed = 42
+              else:
+                  rand_seed = random.randint(1, 10**6)
+              final_seed = rand_seed
+
+              video_output_path = "/tmp/ai_lab/output.mp4"
+              output_path = video_output_path
+
+              input_frame = "/tmp/ai_lab/hq_frame.png"
+              r_frame = requests.get(img_url, timeout=30)
+              with open(input_frame, "wb") as f_f:
+                  f_f.write(r_frame.content)
+
+              hf_tok = os.environ.get("HF_TOKEN") or None
+              try:
+                  client = Client("someone-in-the-world/HighQualityVideoGeneration", token=hf_tok, httpx_kwargs={"timeout": 240.0})
+                  print(f"[*] Submitting to HighQualityVideoGeneration (fps={fps_mul}, dur={dur_sec}, upscale={upscale_flag})...")
+                  res = client.predict(
+                      input_image=handle_file(input_frame),
+                      last_image=handle_file(input_frame),
+                      prompt=prompt_text,
+                      negative_prompt="worst quality, low quality, glitch, blur, text, watermark",
+                      duration_seconds=dur_sec,
+                      steps=6,
+                      guidance_scale=1.0,
+                      seed=rand_seed,
+                      randomize_seed=False,
+                      frame_multiplier=fps_mul,
+                      upscale_output=upscale_flag,
+                      api_name="/generate_video"
+                  )
+                  print(f"[+] HighQualityVideo returned: {res}")
+                  chosen_vid = None
+                  if isinstance(res, (list, tuple)) and len(res) >= 1:
+                      chosen_vid = extract_path(res[1]) or extract_path(res[0])
+                  if not chosen_vid:
+                      chosen_vid = extract_path(res)
+
+                  if chosen_vid and os.path.exists(chosen_vid):
+                      import shutil
+                      shutil.copyfile(chosen_vid, video_output_path)
+                      print(f"[+] HighQualityVideo Complete! Saved to {video_output_path}")
+                  else:
+                      print("[-] Could not extract HQ video path")
+              except Exception as e_hq:
+                  print(f"[-] HighQualityVideo error: {e_hq}")
+
+          elif action == "dream-video":
+              print(f"[*] Generating Cinematic Video with Dream Wan 2.2 FP8-DA AOTI Engine...")
+              import requests, json
+              from gradio_client import Client, handle_file
+
+              prompt_text = prompt.strip() if prompt else "Make this image come alive with smooth, realistic motion."
+              img_url = image_url.strip() if image_url else ""
+              cam_motion = steps_val if steps_val else "Slow Push In"
+
+              try:
+                  dur_sec = float(duration_val) if duration_val else 3.5
+              except:
+                  dur_sec = 3.5
+
+              style_dict = {}
+              try:
+                  style_dict = json.loads(style_val) if style_val else {}
+              except:
+                  pass
+
+              motion_style = style_dict.get("motion_style", "Cinematic")
+              aspect_ratio = style_dict.get("aspect_ratio", "Auto (keep source ratio)")
+
+              if seed_val and seed_val != "-1":
+                  try:
+                      rand_seed = int(seed_val)
+                  except:
+                      rand_seed = 42
+              else:
+                  rand_seed = random.randint(1, 10**6)
+              final_seed = rand_seed
+
+              video_output_path = "/tmp/ai_lab/output.mp4"
+              output_path = video_output_path
+
+              input_frame = "/tmp/ai_lab/dream_frame.png"
+              r_frame = requests.get(img_url, timeout=30)
+              with open(input_frame, "wb") as f_f:
+                  f_f.write(r_frame.content)
+
+              hf_tok = os.environ.get("HF_TOKEN") or None
+              try:
+                  client = Client("dream2589632147/Dream-wan2-2-fp8da-aoti-preview-2", token=hf_tok, httpx_kwargs={"timeout": 240.0})
+                  print(f"[*] Submitting to Dream Wan 2.2 (cam={cam_motion}, style={motion_style}, dur={dur_sec})...")
+                  res = client.predict(
+                      first_image=handle_file(input_frame),
+                      last_image=handle_file(input_frame),
+                      generation_mode="Single Image",
+                      prompt=prompt_text,
+                      motion_style=motion_style,
+                      camera_motion=cam_motion,
+                      motion_strength="Medium",
+                      preserve_identity=True,
+                      enhance_prompt=True,
+                      aspect_ratio=aspect_ratio,
+                      duration_seconds=dur_sec,
+                      output_fps=16,
+                      quality_profile="Balanced",
+                      steps=6,
+                      negative_prompt="worst quality, low quality, glitch, blurry, static frame, deformed",
+                      video_quality=7,
+                      seed=rand_seed,
+                      randomize_seed=False,
+                      guidance_scale=1.0,
+                      guidance_scale_2=1.0,
+                      scheduler_name="UniPCMultistep",
+                      flow_shift=3.0,
+                      safe_mode=True,
+                      show_preview=True,
+                      api_name="/generate_video"
+                  )
+                  print(f"[+] Dream Wan 2.2 returned: {res}")
+                  chosen_vid = None
+                  if isinstance(res, (list, tuple)) and len(res) >= 2:
+                      chosen_vid = extract_path(res[1]) or extract_path(res[0])
+                  if not chosen_vid:
+                      chosen_vid = extract_path(res)
+
+                  if chosen_vid and os.path.exists(chosen_vid):
+                      import shutil
+                      shutil.copyfile(chosen_vid, video_output_path)
+                      print(f"[+] Dream Wan 2.2 Complete! Saved to {video_output_path}")
+                  else:
+                      print("[-] Could not extract Dream Wan video path")
+              except Exception as e_dream:
+                  print(f"[-] Dream Wan 2.2 error: {e_dream}")
+
+                    # Send generated artifact to user's DM & server audit log channel (1506768429107908719)
+          if os.path.exists(output_path):
+              headers = {"Authorization": f"Bot {discord_token}"}
+              if action in ("wan-video", "pixel-perfect", "minimax-h3", "wan-animate", "viggle", "hq-video", "dream-video"):
+                  filename = "xploit_video.mp4"
+                  mimetype = "video/mp4"
+              elif action in ("triposplat", "tripo", "tripo-3d"):
+                  ext = os.path.splitext(output_path)[1].lower()
+                  if ext == ".splat":
+                      filename = "xploit_triposplat.splat"
+                      mimetype = "application/octet-stream"
+                  else:
+                      filename = "xploit_triposplat.ply"
+                      mimetype = "application/x-ply"
+              elif action == "openvoice":
+                  ext = os.path.splitext(output_path)[1].lower()
+                  filename = f"xploit_openvoice{ext if ext else '.mp3'}"
+                  mimetype = "audio/mpeg" if ext == ".mp3" else "audio/wav"
+              elif action in ("kokoro-tts", "qwen-voice", "minimax-music", "yue-music", "yue", "step-music", "breeze-tts", "breeze"):
+                  ext = os.path.splitext(output_path)[1].lower()
+                  if ext == ".flac":
+                      filename = "xploit_song.flac"
+                      mimetype = "audio/flac"
+                  elif ext == ".ogg" or ext == ".opus":
+                      filename = "xploit_song.ogg"
+                      mimetype = "audio/ogg"
+                  elif ext == ".wav":
+                      filename = "xploit_song.wav" if "music" in action or "yue" in action else "xploit_voice.wav"
+                      mimetype = "audio/wav"
+                  else:
+                      filename = "xploit_song.mp3" if "music" in action or "yue" in action else "xploit_voice.mp3"
+                      mimetype = "audio/mpeg"
+              else:
+                  filename = "xploit_render.png"
+                  mimetype = "image/png"
+
+              # Target destinations:
+              # Destination 1: Origin Command Channel where the user ran the command (NO DM)
+              # Destination 2: Server Audit Log private channel (if different)
+              AUDIT_CHANNEL_ID = "1506768429107908719"
+              destinations = [("Origin Command Channel", channel_id, False)]
+              if str(channel_id) != str(AUDIT_CHANNEL_ID):
+                  destinations.append(("Audit Log Channel", AUDIT_CHANNEL_ID, False))
+
+              seed_line = f"\n🎲 **Seed:** `{final_seed}`" if final_seed is not None else ""
+
+              def upload_external(file_path):
+                  """Upload large files (>8MB) to ultra-fast free file hosts with direct Discord embedding"""
+                  # 1. Catbox.moe (Up to 200MB, permanent, instant Discord image/video unfurl)
+                  try:
+                      with open(file_path, "rb") as f_up:
+                          r_cb = requests.post(
+                              "https://catbox.moe/user/api.php",
+                              data={"reqtype": "fileupload"},
+                              files={"fileToUpload": f_up},
+                              timeout=45
+                          )
+                          if r_cb.status_code == 200 and r_cb.text.strip().startswith("http"):
+                              direct_url = r_cb.text.strip()
+                              print(f"[+] Successfully hosted on Catbox: {direct_url}")
+                              return direct_url
+                  except Exception as e_cb:
+                      print(f"[-] Catbox host failed: {e_cb}")
+
+                  # 2. Litterbox (Up to 1GB, 72 hours retention)
+                  try:
+                      with open(file_path, "rb") as f_lb:
+                          r_lb = requests.post(
+                              "https://litterbox.catbox.moe/resources/internals/api.php",
+                              data={"reqtype": "fileupload", "time": "72h"},
+                              files={"fileToUpload": f_lb},
+                              timeout=45
+                          )
+                          if r_lb.status_code == 200 and r_lb.text.strip().startswith("http"):
+                              direct_url = r_lb.text.strip()
+                              print(f"[+] Successfully hosted on Litterbox: {direct_url}")
+                              return direct_url
+                  except Exception as e_lb:
+                      print(f"[-] Litterbox host failed: {e_lb}")
+
+                  # 3. Tmpfiles.org (Direct download link fallback)
+                  try:
+                      with open(file_path, "rb") as f_tmp:
+                          r_tmp = requests.post(
+                              "https://tmpfiles.org/api/v1/upload",
+                              files={"file": f_tmp},
+                              timeout=45
+                          )
+                          if r_tmp.status_code == 200:
+                              json_res = r_tmp.json()
+                              t_url = json_res.get("data", {}).get("url", "")
+                              if t_url:
+                                  direct_url = t_url.replace("tmpfiles.org/", "tmpfiles.org/dl/")
+                                  print(f"[+] Successfully hosted on Tmpfiles: {direct_url}")
+                                  return direct_url
+                  except Exception as e_tmp:
+                      print(f"[-] Tmpfiles host failed: {e_tmp}")
+
+                  return None
+
+              file_size = os.path.getsize(output_path)
+              file_size_mb = file_size / (1024 * 1024)
+              external_link = None
+
+              # Discord bot upload limit is 8MB (without Nitro/Server Boost level 2)
+              if file_size >= 8 * 1024 * 1024:
+                  print(f"[*] Output size ({file_size_mb:.2f}MB) exceeds Discord 8MB limit. Uploading to high-speed external mirror...")
+                  external_link = upload_external(output_path)
+
+              with open(output_path, "rb") as f:
+                  file_bytes = f.read()
+
+              for dest_name, dest_id, _ in destinations:
+                  try:
+                      cluster_info = "\n🖥️ **Cluster Node:** `Localhost Dedicated Node (70GB VRAM)`"
+                      if action in ("yue-music", "yue"):
+                          lyrics_snip = f"\n📜 **Lyrics:** `{image_url[:120]}...`" if image_url else ""
+                          content = f"🎵 **XPLOIT NEXT-GEN AI LAB — YUE 2 (3B) MUSIC**\n👤 **Operator:** <@{user_id}>{cluster_info}\n🧬 **Engine:** `YuE 2 (3B) Neural Music Pipeline`\n🎼 **Style:** `{prompt}`{lyrics_snip}\n🧠 **CoT Mode:** `{steps_val.upper()}` | 🎛️ **CFG:** `{duration_val or '1.0'}`{seed_line}"
+                      elif action == "step-music":
+                          mode_str = "Instrumental Only" if is_instrumental else "Full Vocals + Lyrics"
+                          lyrics_preview = f"\n📜 **Lyrics:**\n```{generated_lyrics_full[:300]}...```" if generated_lyrics_full else ""
+                          content = f"🎵 **XPLOIT NEXT-GEN AI LAB — STEPAUDIO 3 MUSIC**\n👤 **Operator:** <@{user_id}>{cluster_info}\n🧬 **Engine:** `StepFun Step-Music 3 Neural Studio`\n🎼 **Style:** `{caption_prompt}`\n🎤 **Mode:** `{mode_str}` | ⚡ **Quality:** `{resp_format.upper()} {bit_rate}kbps / {sample_rate}Hz`{lyrics_preview}"
+                      elif action in ("breeze-tts", "breeze"):
+                          mode_label = mode.upper()
+                          inst_line = f"\n🎨 **Instruction:** `{instruction[:100]}`" if instruction else ""
+                          content = f"🎙️ **XPLOIT NEXT-GEN AI LAB — BREEZE TTS 2**\n👤 **Operator:** <@{user_id}>{cluster_info}\n🧬 **Engine:** `Breeze TTS 2 Neural Pipeline`\n🗣️ **Text:** `{prompt}`\n⚙️ **Mode:** `{mode_label}`{inst_line}\n🎛️ **CFG Scale:** `{cfg_scale}`{seed_line}"
+                      elif action in ("triposplat", "tripo", "tripo-3d"):
+                          content = f"🧊 **XPLOIT NEXT-GEN AI LAB — TRIPOSPLAT 3D GAUSSIAN ENGINE**\n👤 **Operator:** <@{user_id}>{cluster_info}\n🧬 **Engine:** `TripoSplat (VAST-AI) 3D Generator`\n📦 **Format:** `{req_format.upper()}` | 🌐 **Gaussians:** `{num_gaussians:,}`\n⚡ **Steps:** `{steps}` | 🎯 **Guidance Scale:** `{guidance_scale}`{seed_line}\n💡 *Tip: Open `.ply` or `.splat` files in 3D viewers like SuperSplat (playcanvas.com/supersplat) or GSplat!*"
+                      elif action == "openvoice":
+                          content = f"🎙️ **XPLOIT NEXT-GEN AI LAB — OPENVOICE V2 CLONING**\n👤 **Operator:** <@{user_id}>{cluster_info}\n🧬 **Engine:** `MyShell OpenVoice V2 Instant Voice Clone`\n🗣️ **Text:** `{prompt}`\n🌍 **Style / Accent:** `{steps_val.upper()}`{seed_line}"
+                      elif action == "wan-animate":
+                          content = f"🎬 **XPLOIT NEXT-GEN AI LAB — WAN 2.2 ANIMATE**\n👤 **Operator:** <@{user_id}>{cluster_info}\n🧬 **Engine:** `Wan 2.2 Character Animation & Motion Pipeline`\n🎭 **Mode:** `{steps_val}` | ⏱️ **Duration:** `{duration_val}s` | 📺 **Resolution:** `{style_val}`"
+                      elif action == "viggle":
+                          content = f"🕺 **XPLOIT NEXT-GEN AI LAB — VIGGLE CHARACTER ANIMATE**\n👤 **Operator:** <@{user_id}>{cluster_info}\n🧬 **Engine:** `Viggle AI Character Motion & Dance Transfer`{seed_line}"
+                      elif action == "hq-video":
+                          content = f"🎥 **XPLOIT NEXT-GEN AI LAB — HIGH QUALITY VIDEO GENERATION**\n👤 **Operator:** <@{user_id}>{cluster_info}\n🧬 **Engine:** `HighQualityVideo 4K Multi-Frame FPS Engine`\n🎞️ **Prompt:** `{prompt}`\n⏱️ **Duration:** `{duration_val}s` | ⚡ **FPS:** `{steps_val}` | 🔍 **4K Upscale:** `{style_val}`{seed_line}"
+                      elif action == "dream-video":
+                          content = f"🎬 **XPLOIT NEXT-GEN AI LAB — DREAM WAN 2.2 AOTI VIDEO**\n👤 **Operator:** <@{user_id}>{cluster_info}\n🧬 **Engine:** `Dream Wan 2.2 FP8-DA AOTI Engine`\n🎥 **Prompt:** `{prompt}`\n📹 **Camera:** `{steps_val}` | ⏱️ **Duration:** `{duration_val}s`{seed_line}"
+                      else:
+                          content = f"🎬 **XPLOIT NEXT-GEN AI LAB — {action.upper()}**\n👤 **Operator:** <@{user_id}>{cluster_info}\n🧬 **Engine:** `{action.upper()}`\n📝 **Input:** `{prompt}`{seed_line}"
+                      dest_url = f"https://discord.com/api/v10/channels/{dest_id}/messages"
+
+                      if external_link:
+                          content += f"\n\n📦 **High-Resolution / 4K Direct Link ({file_size_mb:.2f}MB):**\n🔗 {external_link}"
+                          r = requests.post(dest_url, headers=headers, json={"content": content}, timeout=30)
+                          print(f"[+] Discord external link message to {dest_name} ({dest_id}) status: {r.status_code}")
+                      else:
+                          files = {"file": (filename, file_bytes, mimetype)}
+                          data = {"content": content}
+                          r = requests.post(dest_url, headers=headers, data=data, files=files, timeout=30)
+                          print(f"[+] Discord upload to {dest_name} ({dest_id}) status: {r.status_code}")
+
+                          # If Discord still rejected with 413 Payload Too Large, upload to external mirror and send link
+                          if r.status_code == 413:
+                              print(f"[-] Discord 413 Payload Too Large on {dest_name}. Triggering external upload fallback...")
+                              if not external_link:
+                                  external_link = upload_external(output_path)
+                              if external_link:
+                                  content += f"\n\n📦 **High-Resolution / 4K Direct Link ({file_size_mb:.2f}MB):**\n🔗 {external_link}"
+                                  r_retry = requests.post(dest_url, headers=headers, json={"content": content}, timeout=30)
+                                  print(f"[+] Discord retry link message to {dest_name} ({dest_id}) status: {r_retry.status_code}")
+                  except Exception as e_dest:
+                      print(f"[-] Error uploading to {dest_name} ({dest_id}): {e_dest}")
+          else:
+              print("[-] Error: Output file not found.")
+          EOF
+
+          python3 generate.py

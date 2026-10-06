@@ -1,0 +1,113 @@
+name: Xploit-HUB-macOS
+on:
+  workflow_dispatch:
+    inputs:
+      user_id:
+        description: 'Discord User ID'
+        required: true
+      user_name:
+        description: 'Discord User Name'
+        required: true
+      duration:
+        description: 'Duration in minutes'
+        required: true
+        default: '60'
+      wallpaper_url:
+        description: 'Wallpaper URL'
+        required: false
+        default: 'https://raw.githubusercontent.com/asrarkhann116-ops/Xploit-hub-vps/main/xploit_hub_vps_wallpaper.png'
+
+jobs:
+  launch:
+    runs-on: macos-latest
+    timeout-minutes: ${{ fromJSON(github.event.inputs.duration) }}
+    steps:
+      - name: Enable Screen Sharing & Apply Wallpaper
+        env:
+          WALLPAPER_URL: ${{ github.event.inputs.wallpaper_url || 'https://raw.githubusercontent.com/asrarkhann116-ops/Xploit-hub-vps/main/xploit_hub_vps_wallpaper.png' }}
+        run: |
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
+            -activate -configure -access -on \
+            -clientopts -setvnclegacy -vnclegacy yes \
+            -clientopts -setvncpw -vncpw phantom \
+            -restart -agent -privs -all 2>/dev/null || true
+          sudo defaults write /var/db/launchd.db/com.apple.launchd/overrides.plist \
+            com.apple.screensharing -dict Disabled -bool false 2>/dev/null || true
+          sudo launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist 2>/dev/null || true
+
+          # Download and set wallpaper on macOS desktop
+          WALL_PATH="/tmp/xploit_wallpaper.png"
+          curl -sL "$WALLPAPER_URL" -o "$WALL_PATH" || true
+          if [ -f "$WALL_PATH" ]; then
+            osascript -e "tell application \"Finder\" to set desktop picture to POSIX file \"$WALL_PATH\"" 2>/dev/null || true
+          fi
+
+          # Wait for VNC port to be ready
+          echo "Waiting for VNC port 5900..."
+          for i in $(seq 1 30); do
+            nc -z localhost 5900 2>/dev/null && echo "VNC is up!" && break
+            sleep 3
+          done
+
+      - name: Setup noVNC + Cloudflare Tunnel + Send DM
+        # NOTE: Cloudflare tunnel is used here (not bore) because macOS VNC uses Apple Remote
+        # Desktop auth which requires WebCrypto (window.crypto.subtle). WebCrypto only works
+        # in HTTPS contexts. Cloudflare gives a free HTTPS URL — bore.pub is HTTP-only.
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          USER_ID: ${{ github.event.inputs.user_id }}
+          USER_NAME: ${{ github.event.inputs.user_name }}
+          DURATION: ${{ github.event.inputs.duration }}
+        run: |
+          pip3 install websockify --quiet 2>/dev/null || pip install websockify --quiet 2>/dev/null || true
+
+          git clone https://github.com/novnc/noVNC.git --depth 1 > /dev/null 2>&1
+
+          # Start novnc_proxy — serves noVNC web UI + proxies WebSocket to VNC:5900
+          ./noVNC/utils/novnc_proxy --vnc localhost:5900 --listen 8080 > /tmp/novnc.log 2>&1 &
+          sleep 5
+
+          # Fallback: direct websockify if novnc_proxy didn't start
+          if ! pgrep -f "novnc_proxy\|websockify" > /dev/null; then
+            python3 -m websockify --web noVNC/ --timeout 0 8080 localhost:5900 > /tmp/ws.log 2>&1 &
+            sleep 3
+          fi
+
+          # Download cloudflared (macOS) — gives HTTPS URL required for WebCrypto
+          ARCH=$(uname -m)
+          if [ "$ARCH" = "arm64" ]; then
+            curl -sL -o cloudflared \
+              https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-arm64
+          else
+            curl -sL -o cloudflared \
+              https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-darwin-amd64
+          fi
+          chmod +x cloudflared
+
+          nohup ./cloudflared tunnel --url http://localhost:8080 > cloudflared.log 2>&1 &
+
+          CF_URL=""
+          for i in $(seq 1 30); do
+            CF_URL=$(grep -o 'https://[a-z0-9\-]*\.trycloudflare\.com' cloudflared.log 2>/dev/null | head -n 1)
+            [ -n "$CF_URL" ] && break
+            sleep 3
+          done
+
+          CID=$(curl -s -H "Authorization: Bot $DISCORD_TOKEN" -H "Content-Type: application/json" \
+            -X POST -d "{\"recipient_id\": \"$USER_ID\"}" \
+            https://discord.com/api/v10/users/@me/channels | jq -r '.id')
+
+          if [ -z "$CF_URL" ]; then
+            curl -s -H "Authorization: Bot $DISCORD_TOKEN" -H "Content-Type: application/json" \
+              -X POST -d "{\"content\": \"❌ **macOS Launch Failed** — tunnel could not start. Please try again.\"}" \
+              "https://discord.com/api/v10/channels/$CID/messages"
+            exit 1
+          fi
+
+          BROWSER_LINK="$CF_URL/vnc.html?autoconnect=1&password=phantom&compression=2&quality=6"
+
+          curl -s -H "Authorization: Bot $DISCORD_TOKEN" -H "Content-Type: application/json" \
+            -X POST -d "{\"content\": \"🍎 **macOS SONOMA — SESSION ACTIVE**\n👤 **Operator:** <@$USER_ID>\n\n🌐 **Browser Access (no app needed):**\n$BROWSER_LINK\n\n🔑 **VNC Password:** \`phantom\`\n⏱ **Duration:** $DURATION minutes\n\n*Just click the link — opens in your browser directly!*\"}" \
+            "https://discord.com/api/v10/channels/$CID/messages"
+
+          while true; do sleep 3600; done
