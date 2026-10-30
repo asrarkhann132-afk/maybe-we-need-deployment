@@ -1,0 +1,142 @@
+name: Xploit-HUB-Proxy
+on:
+  workflow_dispatch:
+    inputs:
+      user_id:
+        description: 'Discord User ID'
+        required: true
+      user_name:
+        description: 'Discord User Name'
+        required: true
+      duration:
+        description: 'Duration in minutes'
+        required: true
+        default: '60'
+
+jobs:
+  launch:
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ fromJSON(github.event.inputs.duration) }}
+    steps:
+      - name: Setup SOCKS5 Proxy + Bore Tunnel + Send DM
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          USER_ID: ${{ github.event.inputs.user_id }}
+          DURATION: ${{ github.event.inputs.duration }}
+        run: |
+          set -e
+
+          sudo apt-get update -qq
+          sudo apt-get install -y dante-server
+
+          sudo useradd -m -s /bin/bash xploit 2>/dev/null || true
+          echo "xploit:phantom" | sudo chpasswd
+
+          EXT_IF=$(ip route | awk '/default/ {print $5; exit}')
+          echo "External interface: $EXT_IF"
+
+          python3 - << PYEOF
+          import os
+          iface = "$EXT_IF"
+          conf = f"""logoutput: /dev/null
+          internal: 0.0.0.0 port = 1080
+          external: {iface}
+
+          socksmethod: username
+
+          user.privileged: root
+          user.notprivileged: nobody
+
+          client pass {{
+              from: 0.0.0.0/0 to: 0.0.0.0/0
+          }}
+
+          socks pass {{
+              from: 0.0.0.0/0 to: 0.0.0.0/0
+              socksmethod: username
+          }}
+          """
+          with open("/tmp/danted.conf", "w") as f:
+              f.write(conf)
+          print("Dante config written")
+          PYEOF
+
+          sudo danted -f /tmp/danted.conf &
+          sleep 3
+          echo "Dante SOCKS5 server started on port 1080"
+
+          wget -q https://github.com/ekzhang/bore/releases/download/v0.5.0/bore-v0.5.0-x86_64-unknown-linux-musl.tar.gz
+          tar xzf bore-v0.5.0-x86_64-unknown-linux-musl.tar.gz
+          chmod +x bore
+          ./bore local 1080 --to bore.pub > bore.log 2>&1 &
+
+          PORT=""
+          for i in $(seq 1 20); do
+            sleep 3
+            PORT=$(grep -oP 'bore\.pub:\K\d+' bore.log 2>/dev/null || true)
+            [ -z "$PORT" ] && PORT=$(grep -oP 'remote_port=\K\d+' bore.log 2>/dev/null || true)
+            [ -n "$PORT" ] && break
+          done
+
+          if [ -z "$PORT" ]; then
+            echo "ERROR: Bore tunnel failed"
+            cat bore.log
+            exit 1
+          fi
+          echo "Bore PORT: $PORT"
+
+          python3 - << PYEOF
+          import subprocess, json, os
+
+          token = os.environ["DISCORD_TOKEN"]
+          uid   = os.environ["USER_ID"]
+          dur   = os.environ["DURATION"]
+          port  = "$PORT"
+
+          auth_h = "Authorization: Bot " + token
+          ct_h   = "Content-Type: application/json"
+
+          chan_body = json.dumps({"recipient_id": uid})
+          r = subprocess.run(
+              ["curl", "-s", "-X", "POST", "https://discord.com/api/v10/users/@me/channels",
+               "-H", auth_h, "-H", ct_h, "-d", chan_body],
+              capture_output=True, text=True
+          )
+          cid = json.loads(r.stdout).get("id", "")
+          print("Channel ID:", cid)
+
+          if not cid:
+              print("Could not open DM channel:", r.stdout)
+              exit(0)
+
+          msg = (
+              f"🌐 **[PROXY] SESSION ACTIVE**\n"
+              f"Operator: <@{uid}>\n"
+              f"Duration: {dur} minutes\n\n"
+              f"**SOCKS5 Proxy Details:**\n"
+              f"Host     : bore.pub\n"
+              f"Port     : {port}\n"
+              f"Username : xploit\n"
+              f"Password : phantom\n\n"
+              f"**Browser setup (FoxyProxy):**\n"
+              f"1. Install FoxyProxy extension\n"
+              f"2. Add proxy: SOCKS5, bore.pub, {port}, xploit, phantom\n"
+              f"3. Enable -- all browser traffic goes through 1Gbps server\n\n"
+              f"**System proxy (Windows):**\n"
+              f"Settings > Proxy > Manual setup\n"
+              f"SOCKS: bore.pub  Port: {port}\n\n"
+              f"**curl test:**\n"
+              f"curl --socks5 xploit:phantom@bore.pub:{port} https://api.ipify.org"
+          )
+
+          msg_body = json.dumps({"content": msg})
+          result = subprocess.run(
+              ["curl", "-s", "-X", "POST",
+               f"https://discord.com/api/v10/channels/{cid}/messages",
+               "-H", auth_h, "-H", ct_h, "-d", msg_body],
+              capture_output=True, text=True
+          )
+          print("DM result:", result.stdout[:200])
+          PYEOF
+
+          sleep $((DURATION * 60))

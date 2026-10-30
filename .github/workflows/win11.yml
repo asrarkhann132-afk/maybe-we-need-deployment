@@ -1,0 +1,289 @@
+name: Xploit-HUB-Win11
+on:
+  workflow_dispatch:
+    inputs:
+      user_id:
+        description: 'Discord User ID'
+        required: true
+      user_name:
+        description: 'Discord User Name'
+        required: true
+      duration:
+        description: 'Duration in minutes'
+        required: true
+        default: '60'
+      wallpaper_url:
+        description: 'Wallpaper URL'
+        required: false
+        default: 'https://raw.githubusercontent.com/asrarkhann116-ops/Xploit-hub-vps/main/xploit_hub_vps_wallpaper.png'
+
+jobs:
+  launch:
+    runs-on: windows-2025
+    timeout-minutes: ${{ fromJSON(github.event.inputs.duration) }}
+    steps:
+      - name: 🚀 Turbocharge Virtual RAM (16GB NVMe Pagefile)
+        shell: powershell
+        run: |
+          Write-Host "Configuring 16GB Virtual Memory (Pagefile)..."
+          Set-CimInstance -Query "SELECT * FROM Win32_ComputerSystem" -Property @{AutomaticManagedPagefile = $False}
+          $pagefile = Get-CimInstance -ClassName Win32_PageFileSetting -Filter "Name like 'C:%'" -ErrorAction SilentlyContinue
+          if ($pagefile) {
+            $pagefile | Set-CimInstance -Property @{InitialSize = 16384; MaximumSize = 16384}
+          } else {
+            New-CimInstance -ClassName Win32_PageFileSetting -Property @{Name = 'C:\pagefile.sys'; InitialSize = 16384; MaximumSize = 16384}
+          }
+          Write-Host "✅ 16GB High-Speed NVMe Pagefile Active! Total System Memory: ~23GB"
+
+      - name: Enable RDP & Create User + Apply Wallpaper
+        shell: powershell
+        env:
+          WALLPAPER_URL: ${{ github.event.inputs.wallpaper_url || 'https://raw.githubusercontent.com/asrarkhann116-ops/Xploit-hub-vps/main/xploit_hub_vps_wallpaper.png' }}
+        run: |
+          $OutputEncoding = [Console]::InputEncoding = [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding
+
+          secedit /export /cfg C:\secpol.cfg /quiet
+          (Get-Content 'C:\secpol.cfg') -replace 'PasswordComplexity = 1','PasswordComplexity = 0' |
+            Set-Content 'C:\secpol.cfg'
+          secedit /configure /db C:\Windows\security\local.sdb /cfg C:\secpol.cfg /quiet
+          Write-Host 'Password complexity disabled'
+
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' `
+            -Name 'fDenyTSConnections' -Value 0
+          Enable-NetFirewallRule -DisplayGroup 'Remote Desktop'
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' `
+            -Name 'UserAuthentication' -Value 0
+
+          $pw = ConvertTo-SecureString 'phantom' -AsPlainText -Force
+          $u = Get-LocalUser -Name 'xploit' -ErrorAction SilentlyContinue
+          if ($u) {
+            Set-LocalUser -Name 'xploit' -Password $pw -ErrorAction SilentlyContinue
+          } else {
+            New-LocalUser 'xploit' -Password $pw -PasswordNeverExpires -UserMayNotChangePassword -ErrorAction SilentlyContinue
+          }
+          Add-LocalGroupMember -Group 'Administrators'       -Member 'xploit' -ErrorAction SilentlyContinue
+          Add-LocalGroupMember -Group 'Remote Desktop Users' -Member 'xploit' -ErrorAction SilentlyContinue
+
+          $check = Get-LocalUser -Name 'xploit' -ErrorAction SilentlyContinue
+          if ($check) { Write-Host 'SUCCESS: user xploit ready' } else { Write-Host 'ERROR: user xploit not found'; exit 1 }
+
+          # Download and force apply default wallpaper across all sessions
+          try {
+            $wallDir = 'C:\Windows\Web\Wallpaper\Xploit'
+            New-Item -ItemType Directory -Force -Path $wallDir -ErrorAction SilentlyContinue | Out-Null
+            $wallFile = "$wallDir\wallpaper.png"
+            Invoke-WebRequest -Uri $env:WALLPAPER_URL -OutFile $wallFile -UseBasicParsing -ErrorAction SilentlyContinue
+
+            if (Test-Path $wallFile) {
+              # 1. Enforce System-wide Group Policy for Wallpaper (Locks desktop wallpaper for all users)
+              $polKey = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\System'
+              New-Item -Path $polKey -Force -ErrorAction SilentlyContinue | Out-Null
+              New-Item -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System' -Force -ErrorAction SilentlyContinue | Out-Null
+              Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System' -Name 'Wallpaper' -Value $wallFile -Type String -Force -ErrorAction SilentlyContinue
+              Set-ItemProperty -Path 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System' -Name 'WallpaperStyle' -Value '2' -Type String -Force -ErrorAction SilentlyContinue
+
+              # 2. Overwrite Windows default img0.jpg & 4K cached wallpapers so Windows cannot load standard blue wallpaper
+              takeown /f 'C:\Windows\Web\Wallpaper\Windows\img0.jpg' /a 2>$null
+              icacls 'C:\Windows\Web\Wallpaper\Windows\img0.jpg' /grant 'Administrators:(F)' /q 2>$null
+              Copy-Item -Path $wallFile -Destination 'C:\Windows\Web\Wallpaper\Windows\img0.jpg' -Force -ErrorAction SilentlyContinue
+
+              if (Test-Path 'C:\Windows\Web\4K\Wallpaper\Windows') {
+                takeown /f 'C:\Windows\Web\4K\Wallpaper\Windows\*' /a 2>$null
+                icacls 'C:\Windows\Web\4K\Wallpaper\Windows\*' /grant 'Administrators:(F)' /q 2>$null
+                Get-ChildItem 'C:\Windows\Web\4K\Wallpaper\Windows\*.jpg' | ForEach-Object {
+                  Copy-Item -Path $wallFile -Destination $_.FullName -Force -ErrorAction SilentlyContinue
+                }
+              }
+
+              # 3. Apply to default user registry so when 'xploit' logs in for the first time, wallpaper is already set
+              reg load HKU\DefaultTemp C:\Users\Default\NTUSER.DAT 2>$null
+              Set-ItemProperty -Path 'Registry::HKU\DefaultTemp\Control Panel\Desktop' -Name 'Wallpaper' -Value $wallFile -Type String -Force -ErrorAction SilentlyContinue
+              Set-ItemProperty -Path 'Registry::HKU\DefaultTemp\Control Panel\Desktop' -Name 'WallpaperStyle' -Value '2' -Type String -Force -ErrorAction SilentlyContinue
+              reg unload HKU\DefaultTemp 2>$null
+
+              # 4. Also inject an autostart startup script into All Users Startup folder that calls SystemParametersInfo
+              $startupDir = "$env:ProgramData\Microsoft\Windows\Start Menu\Programs\Startup"
+              New-Item -ItemType Directory -Force -Path $startupDir -ErrorAction SilentlyContinue | Out-Null
+              $psCmd = 'Add-Type -TypeDefinition "using System; using System.Runtime.InteropServices; public class W { [DllImport(\"user32.dll\")] public static extern int SystemParametersInfo(int a, int b, string c, int d); }"; [W]::SystemParametersInfo(20, 0, \"C:\Windows\Web\Wallpaper\Xploit\wallpaper.png\", 3)'
+              Set-Content -Path 'C:\Windows\set_wall.ps1' -Value $psCmd -Force
+              Set-Content -Path "$startupDir\set_wall.cmd" -Value 'powershell.exe -ExecutionPolicy Bypass -NoProfile -WindowStyle Hidden -File C:\Windows\set_wall.ps1' -Force
+
+              Write-Host "Wallpaper configured: $wallFile"
+            }
+          } catch {
+            Write-Host "Wallpaper setup warning: $_"
+          }
+
+      - name: ⚡ Ultra-Gaming 60 FPS & Low-Latency Engine
+        shell: powershell
+        run: |
+          Write-Host "🚀 Applying 60 FPS RDP, Low Latency TCP & DWM Performance Tweaks..."
+
+          # 1. Unlock 60 FPS in DWM and Terminal Services (Default is 30 FPS cap)
+          $wsPath = 'HKLM:\SYSTEM\CurrentControlSet\Control\Terminal Server\WinStations'
+          $rdpTcp = "$wsPath\RDP-Tcp"
+          if (-not (Test-Path $wsPath)) { New-Item -Path $wsPath -Force -ErrorAction SilentlyContinue | Out-Null }
+          if (-not (Test-Path $rdpTcp)) { New-Item -Path $rdpTcp -Force -ErrorAction SilentlyContinue | Out-Null }
+          Set-ItemProperty -Path $wsPath -Name 'DWM8FrameRate' -Value 60 -Type DWord -Force -ErrorAction SilentlyContinue
+          Set-ItemProperty -Path $rdpTcp -Name 'DWM8FrameRate' -Value 60 -Type DWord -Force -ErrorAction SilentlyContinue
+
+          # 2. RemoteFX, H.264 / AVC444 Hardware Codec & High-Speed LAN Profile
+          $tsPol = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows NT\Terminal Services'
+          if (-not (Test-Path $tsPol)) { New-Item -Path $tsPol -Force -ErrorAction SilentlyContinue | Out-Null }
+          Set-ItemProperty -Path $tsPol -Name 'fEnableRemoteFXAdvancedRemoteFX' -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue
+          Set-ItemProperty -Path $tsPol -Name 'selectnetworkdetect' -Value 2 -Type DWord -Force -ErrorAction SilentlyContinue
+          Set-ItemProperty -Path $tsPol -Name 'fEnableHardwareAcceleration' -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue
+          Set-ItemProperty -Path $tsPol -Name 'fEnableH264AMD' -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue
+          Set-ItemProperty -Path $tsPol -Name 'bEnforceAVC444' -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue
+          Set-ItemProperty -Path $tsPol -Name 'VisualQuality' -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue
+          Set-ItemProperty -Path $tsPol -Name 'MaxMonitors' -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue
+          Set-ItemProperty -Path $tsPol -Name 'MaxXResolution' -Value 1920 -Type DWord -Force -ErrorAction SilentlyContinue
+          Set-ItemProperty -Path $tsPol -Name 'MaxYResolution' -Value 1080 -Type DWord -Force -ErrorAction SilentlyContinue
+
+          # 3. Disable Nagle's Algorithm (TcpAckFrequency & TCPNoDelay) for Instant Key/Mouse Response
+          $tcpParams = 'HKLM:\SYSTEM\CurrentControlSet\Services\Tcpip\Parameters\Interfaces'
+          if (Test-Path $tcpParams) {
+            Get-ChildItem $tcpParams -ErrorAction SilentlyContinue | ForEach-Object {
+              Set-ItemProperty -Path $_.PSPath -Name 'TcpAckFrequency' -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue
+              Set-ItemProperty -Path $_.PSPath -Name 'TCPNoDelay' -Value 1 -Type DWord -Force -ErrorAction SilentlyContinue
+              Set-ItemProperty -Path $_.PSPath -Name 'TcpDelAckTicks' -Value 0 -Type DWord -Force -ErrorAction SilentlyContinue
+            }
+          }
+
+          # 4. Windows Multimedia & Gaming Performance Engine
+          $sysProfile = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\Multimedia\SystemProfile'
+          if (-not (Test-Path $sysProfile)) { New-Item -Path $sysProfile -Force -ErrorAction SilentlyContinue | Out-Null }
+          Set-ItemProperty -Path $sysProfile -Name 'NetworkThrottlingIndex' -Value 0xFFFFFFFF -Type DWord -Force -ErrorAction SilentlyContinue
+          Set-ItemProperty -Path $sysProfile -Name 'SystemResponsiveness' -Value 0 -Type DWord -Force -ErrorAction SilentlyContinue
+          
+          $gamesTask = "$sysProfile\Tasks\Games"
+          if (-not (Test-Path $gamesTask)) { New-Item -Path $gamesTask -Force -ErrorAction SilentlyContinue | Out-Null }
+          Set-ItemProperty -Path $gamesTask -Name 'GPU Priority' -Value 8 -Type DWord -Force -ErrorAction SilentlyContinue
+          Set-ItemProperty -Path $gamesTask -Name 'Priority' -Value 6 -Type DWord -Force -ErrorAction SilentlyContinue
+          Set-ItemProperty -Path $gamesTask -Name 'Scheduling Category' -Value 'High' -Type String -Force -ErrorAction SilentlyContinue
+          Set-ItemProperty -Path $gamesTask -Name 'SFIO Priority' -Value 'High' -Type String -Force -ErrorAction SilentlyContinue
+
+          # 5. Foreground CPU Priority Boost (Win32PrioritySeparation = 38)
+          $priCtrl = 'HKLM:\SYSTEM\CurrentControlSet\Control\PriorityControl'
+          if (-not (Test-Path $priCtrl)) { New-Item -Path $priCtrl -Force -ErrorAction SilentlyContinue | Out-Null }
+          Set-ItemProperty -Path $priCtrl -Name 'Win32PrioritySeparation' -Value 38 -Type DWord -Force -ErrorAction SilentlyContinue
+
+          # 6. Optimize Visual Effects for Speed & Smoothness
+          $visFx = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\VisualEffects'
+          if (-not (Test-Path $visFx)) { New-Item -Path $visFx -Force -ErrorAction SilentlyContinue | Out-Null }
+          Set-ItemProperty -Path $visFx -Name 'VisualFXSetting' -Value 2 -Type DWord -Force -ErrorAction SilentlyContinue
+
+          Write-Host "✅ 60 FPS RDP Engine, RemoteFX AVC444 & Zero-Delay TCP Active!"
+
+      - name: Bore Tunnel & Send DM
+        shell: powershell
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          USER_ID: ${{ github.event.inputs.user_id }}
+          USER_NAME: ${{ github.event.inputs.user_name }}
+          DURATION: ${{ github.event.inputs.duration }}
+        run: |
+          $OutputEncoding = [Console]::InputEncoding = [Console]::OutputEncoding = New-Object System.Text.UTF8Encoding
+          $ProgressPreference = 'SilentlyContinue'
+          Invoke-WebRequest 'https://github.com/ekzhang/bore/releases/download/v0.5.0/bore-v0.5.0-x86_64-pc-windows-msvc.zip' -OutFile bore.zip
+          Expand-Archive -LiteralPath bore.zip -DestinationPath . -Force
+
+          Start-Process -FilePath '.\bore.exe' -ArgumentList 'local','3389','--to','bore.pub' `
+            -RedirectStandardOutput 'bore.log' -RedirectStandardError 'bore.err' -NoNewWindow
+
+          $PORT = ''
+          for ($i = 0; $i -lt 20; $i++) {
+            Start-Sleep 3
+            $log = @()
+            if (Test-Path bore.log) { $log += Get-Content bore.log -Encoding UTF8 -ErrorAction SilentlyContinue }
+            if (Test-Path bore.err) { $log += Get-Content bore.err -Encoding UTF8 -ErrorAction SilentlyContinue }
+            foreach ($line in $log) {
+              if ($line -match 'bore\.pub:(\d+)')   { $PORT = $Matches[1]; break }
+              if ($line -match 'remote_port=(\d+)') { $PORT = $Matches[1]; break }
+            }
+            if ($PORT) { break }
+          }
+
+          if (-not $PORT) { Write-Host 'ERROR: Bore tunnel failed.'; exit 1 }
+
+          Write-Host '======================================'
+          Write-Host '  WINDOWS 11 RDP - SESSION ACTIVE'
+          Write-Host '======================================'
+          Write-Host "  Computer : bore.pub:$PORT"
+          Write-Host '  Username : xploit'
+          Write-Host '  Password : phantom'
+          Write-Host "  Duration : $env:DURATION minutes"
+          Write-Host '======================================'
+
+          $TOKEN = $env:DISCORD_TOKEN
+          $UID   = $env:USER_ID
+          $DUR   = $env:DURATION
+          $nl    = "`n"
+
+          $MSG  = "🍷 [Windows 11 RDP] SESSION ACTIVE" + $nl
+          $MSG += "Operator: <@$UID>" + $nl + $nl
+          $MSG += "Open Remote Desktop Connection:" + $nl
+          $MSG += "Computer : bore.pub:$PORT" + $nl
+          $MSG += "Username : xploit" + $nl
+          $MSG += "Password : phantom" + $nl
+          $MSG += "Duration : $DUR minutes" + $nl
+          $MSG += "⚡ 60 FPS Ultra-Gaming Engine: ACTIVE" + $nl
+          $MSG += "💡 Tip: In Remote Desktop Connection (mstsc), set Experience -> 'LAN (10 Mbps+)' & Display -> 'High Color (16-bit)' for butter-smooth gameplay!" + $nl + $nl
+          $MSG += "Accept any certificate warnings."
+
+          $chanFile  = "$env:TEMP\chan.json"
+          $msgFile   = "$env:TEMP\msg.json"
+          $utf8NoBOM = [System.Text.UTF8Encoding]::new($false)
+          $chanJson  = [pscustomobject]@{ recipient_id = $UID } | ConvertTo-Json -Compress
+          $msgJson   = [pscustomobject]@{ content = $MSG } | ConvertTo-Json -Compress
+          [System.IO.File]::WriteAllText($chanFile, $chanJson, $utf8NoBOM)
+          [System.IO.File]::WriteAllText($msgFile,  $msgJson,  $utf8NoBOM)
+
+                    $AUTH   = "Authorization: Bot $TOKEN"
+          $dmSent = $false
+
+          for ($attempt = 1; $attempt -le 5; $attempt++) {
+            $chanResp = curl.exe -s -X POST 'https://discord.com/api/v10/users/@me/channels' `
+              -H $AUTH -H 'Content-Type: application/json' --data "@$chanFile"
+            Write-Host ("Chan resp attempt " + $attempt + ": " + $chanResp)
+            $chanObj = $chanResp | ConvertFrom-Json -ErrorAction SilentlyContinue
+            if ($chanObj.retry_after) {
+              $waitSec = [math]::Ceiling([double]$chanObj.retry_after) + (Get-Random -Minimum 1 -Maximum 3)
+              Write-Host ("Rate limited on channel create. Sleeping " + $waitSec + "s...")
+              Start-Sleep -Seconds $waitSec
+              continue
+            }
+            $CID = $chanObj.id
+            if ($CID) { break }
+            Start-Sleep -Seconds (Get-Random -Minimum 2 -Maximum 5)
+          }
+
+          if ($CID) {
+            for ($attempt = 1; $attempt -le 5; $attempt++) {
+              $sendResp = curl.exe -s -X POST "https://discord.com/api/v10/channels/$CID/messages" `
+                -H $AUTH -H 'Content-Type: application/json' --data "@$msgFile"
+              Write-Host ("DM resp attempt " + $attempt + ": " + $sendResp)
+              $sendObj = $sendResp | ConvertFrom-Json -ErrorAction SilentlyContinue
+              if ($sendObj.retry_after) {
+                $waitSec = [math]::Ceiling([double]$sendObj.retry_after) + (Get-Random -Minimum 1 -Maximum 3)
+                Write-Host ("Rate limited on message send. Sleeping " + $waitSec + "s...")
+                Start-Sleep -Seconds $waitSec
+                continue
+              }
+              if ($sendResp -notmatch '"code"') {
+                $dmSent = $true
+                Write-Host 'DM sent OK.'
+                break
+              }
+              Start-Sleep -Seconds (Get-Random -Minimum 2 -Maximum 5)
+            }
+          }
+
+          if (-not $dmSent) {
+            Write-Host 'Trying VPS channel fallback...'
+            $chanPost = curl.exe -s -X POST 'https://discord.com/api/v10/channels/1497364285645652098/messages' `
+              -H $AUTH -H 'Content-Type: application/json' --data "@$msgFile"
+            Write-Host "Channel resp: $chanPost"
+          }
+
+          Start-Sleep ([int]$env:DURATION * 60)

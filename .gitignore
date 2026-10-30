@@ -1,0 +1,6 @@
+.env
+node_modules/
+package-lock.json
+*.log
+cf
+.github/workflows/.env

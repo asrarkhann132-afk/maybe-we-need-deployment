@@ -1,0 +1,183 @@
+name: Xploit-HUB-VPN
+on:
+  workflow_dispatch:
+    inputs:
+      user_id:
+        description: 'Discord User ID'
+        required: true
+      user_name:
+        description: 'Discord User Name'
+        required: true
+      duration:
+        description: 'Duration in minutes'
+        required: true
+        default: '60'
+
+jobs:
+  launch:
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ fromJSON(github.event.inputs.duration) }}
+    steps:
+      - name: SoftEther VPN + Bore Tunnels + Send DM
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          USER_ID: ${{ github.event.inputs.user_id }}
+          DURATION: ${{ github.event.inputs.duration }}
+        run: |
+          set -e
+          sudo apt-get update -qq
+          sudo apt-get install -y wget unzip
+
+          echo "Downloading SoftEther VPN Server..."
+          wget -q "https://github.com/SoftEtherVPN/SoftEtherVPN_Stable/releases/download/v4.43-9799-beta/softether-vpnserver-v4.43-9799-beta-2023.08.31-linux-x64-64bit.tar.gz" -O se.tar.gz
+          tar xzf se.tar.gz
+          cd vpnserver
+          echo "1" | make
+          chmod 600 *
+          chmod 700 vpnserver vpncmd
+          echo "SoftEther built OK"
+
+          sudo ./vpnserver start
+          sleep 10
+          echo "VPN server started"
+
+          # ---- Step 1: Set admin password via /IN: file (interactive, no /PASSWORD: inline) ----
+          cat > /tmp/s1.txt << 'CMDEOF'
+          ServerPasswordSet
+          xploithub
+          xploithub
+          exit
+          CMDEOF
+          sed -i 's/^[[:space:]]*//' /tmp/s1.txt
+          ./vpncmd localhost:443 /SERVER /PASSWORD: /IN:/tmp/s1.txt
+          echo "Admin password set"
+
+          # ---- Step 2: SoftEther default hub is called VPN -- create only if missing ----
+          ./vpncmd localhost:443 /SERVER /PASSWORD:xploithub /CMD HubCreate VPN /PASSWORD: 2>/dev/null || true
+          echo "Hub ready"
+
+          # ---- Step 3: Create user + set password in VPN hub ----
+          # UserCreate accepts inline params, UserPasswordSet needs interactive input
+          ./vpncmd localhost:443 /SERVER /PASSWORD:xploithub /HUB:VPN /CMD UserCreate xploit /GROUP:none /REALNAME:xploit /NOTE:none 2>/dev/null || true
+
+          cat > /tmp/s2.txt << 'CMDEOF'
+          UserPasswordSet xploit
+          phantom
+          phantom
+          exit
+          CMDEOF
+          sed -i 's/^[[:space:]]*//' /tmp/s2.txt
+          ./vpncmd localhost:443 /SERVER /PASSWORD:xploithub /HUB:VPN /IN:/tmp/s2.txt
+          echo "User xploit created"
+
+          # ---- Step 4: Enable SSTP + OpenVPN (TCP 1194) ----
+          ./vpncmd localhost:443 /SERVER /PASSWORD:xploithub /CMD SstpEnable yes
+          ./vpncmd localhost:443 /SERVER /PASSWORD:xploithub /CMD OpenVpnEnable yes /PORTS:1194
+          sleep 2
+          ./vpncmd localhost:443 /SERVER /PASSWORD:xploithub /CMD OpenVpnMakeConfig /SAVEPATH:/tmp/openvpn_config.zip
+          echo "SoftEther configured"
+
+          # ---- Step 5: Extract + fix .ovpn for bore.pub (force TCP) ----
+          cd /tmp
+          unzip -o openvpn_config.zip -d ovpn_configs
+
+          echo "Downloading bore..."
+          wget -q https://github.com/ekzhang/bore/releases/download/v0.5.0/bore-v0.5.0-x86_64-unknown-linux-musl.tar.gz
+          tar xzf bore-v0.5.0-x86_64-unknown-linux-musl.tar.gz
+          chmod +x bore
+
+          # Tunnel 1: SSTP on port 443
+          ./bore local 443 --to bore.pub > bore_sstp.log 2>&1 &
+          # Tunnel 2: OpenVPN on port 1194
+          ./bore local 1194 --to bore.pub > bore_ovpn.log 2>&1 &
+
+          SSTP_PORT=""
+          OVPN_PORT=""
+          for i in $(seq 1 30); do
+            sleep 3
+            [ -z "$SSTP_PORT" ] && SSTP_PORT=$(grep -oP 'bore\.pub:\K\d+' bore_sstp.log 2>/dev/null || grep -oP 'remote_port=\K\d+' bore_sstp.log 2>/dev/null || true)
+            [ -z "$OVPN_PORT" ] && OVPN_PORT=$(grep -oP 'bore\.pub:\K\d+' bore_ovpn.log 2>/dev/null || grep -oP 'remote_port=\K\d+' bore_ovpn.log 2>/dev/null || true)
+            [ -n "$SSTP_PORT" ] && [ -n "$OVPN_PORT" ] && break
+          done
+
+          echo "SSTP_PORT: $SSTP_PORT  OVPN_PORT: $OVPN_PORT"
+          [ -z "$SSTP_PORT" ] && { echo "SSTP bore failed:"; cat bore_sstp.log; exit 1; }
+          [ -z "$OVPN_PORT" ] && { echo "OpenVPN bore failed:"; cat bore_ovpn.log; exit 1; }
+
+          # Fix .ovpn -- set bore.pub remote + force TCP (bore only does TCP)
+          OVPN_FILE=$(find /tmp/ovpn_configs -name "*.ovpn" | head -1)
+          echo "Using ovpn: $OVPN_FILE"
+
+          python3 - << PYEOF
+          import re
+
+          with open("$OVPN_FILE", 'r') as f:
+              content = f.read()
+
+          port = "$OVPN_PORT"
+          content = re.sub(r'^remote\s+\S+\s+\d+.*$', f'remote bore.pub {port}', content, flags=re.MULTILINE)
+          content = re.sub(r'^proto\s+\S+$', 'proto tcp', content, flags=re.MULTILINE)
+          if '\nproto tcp' not in content and not content.startswith('proto tcp'):
+              content = 'proto tcp\n' + content
+
+          with open('/tmp/xploit-vpn.ovpn', 'w') as f:
+              f.write(content)
+          print("ovpn fixed, bore port:", port)
+          PYEOF
+
+          # ---- Step 6: Send DM ----
+          python3 - << PYEOF
+          import subprocess, json, os
+
+          token      = os.environ["DISCORD_TOKEN"]
+          uid        = os.environ["USER_ID"]
+          dur        = os.environ["DURATION"]
+          sstp_port  = "$SSTP_PORT"
+          ovpn_port  = "$OVPN_PORT"
+
+          auth_h = "Authorization: Bot " + token
+          ct_h   = "Content-Type: application/json"
+
+          r = subprocess.run(
+              ["curl", "-s", "-X", "POST", "https://discord.com/api/v10/users/@me/channels",
+               "-H", auth_h, "-H", ct_h,
+               "-d", json.dumps({"recipient_id": uid})],
+              capture_output=True, text=True
+          )
+          cid = json.loads(r.stdout).get("id", "")
+          print("CID:", cid)
+
+          if not cid:
+              print("No DM channel:", r.stdout)
+              exit(0)
+
+          msg = (
+              f"🔒 **[VPN] SESSION ACTIVE**\n"
+              f"Operator: <@{uid}>\n"
+              f"Duration: {dur} minutes\n\n"
+              f"**Option 1 -- SSTP (Windows built-in, zero extra software):**\n"
+              f"Settings > Network > VPN > Add VPN connection\n"
+              f"VPN provider: Windows built-in\n"
+              f"Server name: bore.pub:{sstp_port}\n"
+              f"VPN type: Secure Socket Tunneling Protocol (SSTP)\n"
+              f"Username: xploit\n"
+              f"Password: phantom\n\n"
+              f"**Option 2 -- OpenVPN (xploit-vpn.ovpn file attached):**\n"
+              f"Install OpenVPN client > Import .ovpn file > Connect\n"
+              f"Server: bore.pub:{ovpn_port}\n"
+              f"Username: xploit  |  Password: phantom\n\n"
+              f"Both options route ALL traffic through 1Gbps server."
+          )
+
+          result = subprocess.run(
+              ["curl", "-s", "-X", "POST",
+               f"https://discord.com/api/v10/channels/{cid}/messages",
+               "-H", auth_h,
+               "-F", f"content={msg}",
+               "-F", "file=@/tmp/xploit-vpn.ovpn;filename=xploit-vpn.ovpn"],
+              capture_output=True, text=True
+          )
+          print("DM:", result.stdout[:300])
+          PYEOF
+
+          sleep $((DURATION * 60))

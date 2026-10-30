@@ -1,0 +1,69 @@
+name: Kill-All-Active-Nodes
+on:
+  workflow_dispatch:
+
+jobs:
+  kill:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Mother-Cluster
+            token_secret: MOTHER_PAT
+            target: "asrarkhann116-ops/Xploit-hub-vps"
+          -  name: Cluster-5
+             token_secret: CLUSTER_5_PAT
+             target: "raufs6801-maker/Bro-vpes"
+          - name: Cluster-4
+            token_secret: CLUSTER_4_PAT
+            target: "asrarkhann127-glitch/Xploit-hub-vps"
+          - name: Cluster-6
+            token_secret: CLUSTER_6_PAT
+            target: "asrarkhann120-hue/Xploit-hub-vps"
+          - name: Cluster-7
+            token_secret: CLUSTER_7_PAT
+            target: "asrarkhann128-png/Xploit-hub-vps"
+          - name: Cluster-8
+            token_secret: CLUSTER_8_PAT
+            target: "asrarkhann124-boop/Xploit-hub-vps"
+          - name: Cluster-9
+            token_secret: CLUSTER_9_PAT
+            target: "asrarkhann132-afk/maybe-we-need-deployment"
+          # - name: Cluster-10 (Suspended)
+          #   token_secret: CLUSTER_10_PAT
+          #   target: "asrarkhann114-hash/literate-engine"
+          - name: Cluster-11
+            token_secret: CLUSTER_11_PAT
+            target: "asrarkhann135-sudo/fictional-barnacle"
+    steps:
+      - name: Cancel all running nodes on ${{ matrix.name }}
+        env:
+          CLUSTER_PAT: ${{ secrets[matrix.token_secret] }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          if [ -z "$CLUSTER_PAT" ]; then
+            echo "⚠️ No PAT for ${{ matrix.name }}, skipping..."
+            exit 0
+          fi
+          echo "🛑 Finding running nodes on ${{ matrix.name }} ($TARGET)..."
+
+          # Fetch in_progress and queued runs for crypto-donate.yml
+          RUNS=$(curl -s -H "Authorization: token $CLUSTER_PAT" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/$TARGET/actions/workflows/crypto-donate.yml/runs?per_page=100")
+
+          RUN_IDS=$(echo "$RUNS" | jq -r '.workflow_runs[] | select(.status=="in_progress" or .status=="queued") | .id')
+
+          if [ -z "$RUN_IDS" ]; then
+            echo "✅ No active nodes on ${{ matrix.name }}."
+            exit 0
+          fi
+
+          for ID in $RUN_IDS; do
+            echo "Killing run ID: $ID on ${{ matrix.name }}..."
+            curl -s -X POST -H "Authorization: token $CLUSTER_PAT" \
+              -H "Accept: application/vnd.github.v3+json" \
+              "https://api.github.com/repos/$TARGET/actions/runs/$ID/cancel"
+          done
+          echo "✅ All active nodes cancelled on ${{ matrix.name }}!"
